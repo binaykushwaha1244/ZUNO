@@ -13,7 +13,7 @@
   <a href="#technology-stack"><img src="https://img.shields.io/badge/Room_Database-v4-emerald.svg?style=flat-square" alt="Room Database"></a>
   <a href="#technology-stack"><img src="https://img.shields.io/badge/Target_SDK-37-red.svg?style=flat-square" alt="Target SDK"></a>
   <a href="#privacy-and-offline-philosophy"><img src="https://img.shields.io/badge/Privacy-100%25_Offline-success.svg?style=flat-square" alt="100% Offline"></a>
-  <a href="#automated-testing"><img src="https://img.shields.io/badge/Tests-100%20Passed-brightgreen.svg?style=flat-square" alt="100 Tests Passed"></a>
+  <a href="#automated-testing"><img src="https://img.shields.io/badge/Tests-102%20Passed-brightgreen.svg?style=flat-square" alt="102 Tests Passed"></a>
 </p>
 
 ---
@@ -363,7 +363,7 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`
 ```powershell
 .\gradlew.bat test
 ```
-Result: **100 / 100 tests passing (100% pass rate)**. See [docs/TESTING.md](docs/TESTING.md) for details.
+Result: **102 / 102 tests passing (100% pass rate)**. See [docs/TESTING.md](docs/TESTING.md) for details.
 
 ---
 
@@ -380,6 +380,9 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 A pre-built standalone APK is available at:
 `D:\Projects\ZUNO-Release\ZUNO-debug.apk`
 
+- **File Size:** 25,258,049 bytes (24.08 MB)
+- **SHA-256:** `468DF141D8D3CB706BD44176FAF93F89B2D3523B3E2AF79EB7FC8CCAED45591A`
+
 ---
 
 ## 24. Troubleshooting & Limitations
@@ -394,7 +397,7 @@ A pre-built standalone APK is available at:
 
 Contributions are welcome! Please follow these standards:
 1. Ensure all code conforms to Kotlin coding conventions.
-2. Run `.\gradlew.bat test` to confirm all 100 tests pass without regression.
+2. Run `.\gradlew.bat test` to confirm all 102 tests pass without regression.
 3. Preserve the offline-first, zero-tracking philosophy.
 
 ---

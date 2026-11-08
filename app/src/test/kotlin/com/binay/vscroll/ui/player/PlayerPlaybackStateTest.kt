@@ -21,6 +21,7 @@ class PlayerPlaybackStateTest {
         val state = PlayerPlaybackState()
         assertFalse(state.isPlaying)
         assertFalse(state.isBuffering)
+        assertFalse(state.isFirstFrameRendered)
         assertFalse(state.isUserPaused)
         assertNull(state.currentVideo)
         assertNull(state.playbackError)
@@ -29,6 +30,40 @@ class PlayerPlaybackStateTest {
         assertEquals(1.0f, state.playbackSpeed)
         assertFalse(state.isMuted)
         assertFalse(state.isControlsVisible)
+    }
+
+    @Test
+    fun playerPlaybackState_firstFrameRenderedTransition() {
+        var state = PlayerPlaybackState(isBuffering = false, isFirstFrameRendered = false)
+        assertFalse(state.isFirstFrameRendered)
+
+        // When video decoder renders first frame to Surface
+        state = state.copy(isFirstFrameRendered = true, isBuffering = false)
+        assertTrue(state.isFirstFrameRendered)
+        assertFalse(state.isBuffering)
+    }
+
+    @Test
+    fun settingsThemeGrid_chunksIntoTwoRowsOfThree() {
+        val rows = com.binay.vscroll.ui.theme.VScrollThemeMode.entries.chunked(3)
+        assertEquals(2, rows.size)
+        assertEquals(3, rows[0].size)
+        assertEquals(3, rows[1].size)
+
+        // Verify row 1 contents
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.ZUNO, rows[0][0])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.OCEAN_POP, rows[0][1])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.SUNSET_GLOW, rows[0][2])
+
+        // Verify row 2 contents
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.FRESH_MINT, rows[1][0])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.LAVENDER_DREAM, rows[1][1])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.MIDNIGHT, rows[1][2])
+
+        // Verify displayNames are non-blank
+        com.binay.vscroll.ui.theme.VScrollThemeMode.entries.forEach { mode ->
+            assertTrue(mode.displayName.isNotBlank())
+        }
     }
 
     @Test

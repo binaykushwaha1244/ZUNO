@@ -81,6 +81,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         scheduleControlsAutoHide()
     }
 
+    fun preloadNextVideo(video: VideoItem?) {
+        playerManager.preloadNextVideo(video)
+    }
+
+    fun preloadNeighbors(videos: List<VideoItem>, currentIndex: Int) {
+        listOf(currentIndex - 1, currentIndex + 1, currentIndex + 2).forEach { idx ->
+            videos.getOrNull(idx)?.let { playerManager.preloadNextVideo(it) }
+        }
+    }
+
     fun togglePlayPause() {
         val nowPlaying = playerManager.togglePlayPause()
         triggerPlayPauseAnimation(isPlaying = nowPlaying)

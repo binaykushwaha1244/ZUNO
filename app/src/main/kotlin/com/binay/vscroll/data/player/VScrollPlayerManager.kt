@@ -1,14 +1,19 @@
 package com.binay.vscroll.data.player
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import com.binay.vscroll.data.thumbnail.ThumbnailLoader
 import com.binay.vscroll.domain.model.VideoItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +29,7 @@ import kotlinx.coroutines.launch
 data class PlayerPlaybackState(
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
+    val isFirstFrameRendered: Boolean = false,
     val currentVideo: VideoItem? = null,
     val isUserPaused: Boolean = false,
     val playbackError: String? = null,
@@ -65,13 +71,37 @@ class VScrollPlayerManager(
         get() = exoPlayer ?: initPlayer().also { exoPlayer = it }
 
     private val playerListener = object : Player.Listener {
+        override fun onRenderedFirstFrame() {
+            PlaybackTransitionTracer.markEvent("10. FIRST_VIDEO_FRAME_RENDERED")
+            _playbackState.update { it.copy(isFirstFrameRendered = true, isBuffering = false) }
+        }
+
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            Log.d("ZUNO_QUALITY", "onVideoSizeChanged: ${videoSize.width}x${videoSize.height}, unappliedRotation=${videoSize.unappliedRotationDegrees}")
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+            for (group in tracks.groups) {
+                if (group.type == C.TRACK_TYPE_VIDEO && group.isSelected) {
+                    for (i in 0 until group.length) {
+                        if (group.isTrackSelected(i)) {
+                            val format = group.getTrackFormat(i)
+                            Log.d("ZUNO_QUALITY", "Selected video track: ${format.width}x${format.height}, bitrate=${format.bitrate}, mime=${format.sampleMimeType}")
+                        }
+                    }
+                }
+            }
+        }
+
         override fun onPlaybackStateChanged(state: Int) {
             watchTimeTracker?.onPlaybackStateChanged(state)
             when (state) {
                 Player.STATE_BUFFERING -> {
+                    PlaybackTransitionTracer.markEvent("7. PLAYER_STATE_BUFFERING")
                     _playbackState.update { it.copy(isBuffering = true, playbackError = null) }
                 }
                 Player.STATE_READY -> {
+                    PlaybackTransitionTracer.markEvent("8. PLAYER_STATE_READY")
                     val dur = exoPlayer?.duration?.takeIf { it > 0 }
                         ?: _playbackState.value.currentVideo?.durationMillis
                         ?: 0L
@@ -94,6 +124,9 @@ class VScrollPlayerManager(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) {
+                PlaybackTransitionTracer.markEvent("12. PLAYBACK_ACTUAL_START")
+            }
             watchTimeTracker?.onIsPlayingChanged(isPlaying, exoPlayer?.playWhenReady ?: false)
             _playbackState.update {
                 it.copy(
@@ -133,8 +166,17 @@ class VScrollPlayerManager(
             .setUsage(C.USAGE_MEDIA)
             .build()
 
+        val trackSelector = DefaultTrackSelector(appContext).apply {
+            parameters = buildUponParameters()
+                .setForceHighestSupportedBitrate(true)
+                .setExceedRendererCapabilitiesIfNecessary(true)
+                .setExceedVideoConstraintsIfNecessary(true)
+                .build()
+        }
+
         return ExoPlayer.Builder(appContext)
             .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
+            .setTrackSelector(trackSelector)
             .build()
             .apply {
                 repeatMode = Player.REPEAT_MODE_ONE // Loop current video; advance only on user swipe
@@ -165,6 +207,13 @@ class VScrollPlayerManager(
         progressTrackingJob = null
     }
 
+    fun preloadNextVideo(video: VideoItem?) {
+        if (video == null) return
+        scope.launch(Dispatchers.IO) {
+            ThumbnailLoader.loadThumbnail(appContext, video.id, video.contentUri)
+        }
+    }
+
     fun playVideo(video: VideoItem) {
         val activePlayer = player
         val current = _playbackState.value.currentVideo
@@ -178,12 +227,15 @@ class VScrollPlayerManager(
         }
 
         watchTimeTracker?.onVideoChanged(video)
+        PlaybackTransitionTracer.markEvent("3. ACTIVE_MEDIA_ITEM_SELECTED", "id=${video.id}")
+        PlaybackTransitionTracer.markEvent("4. MEDIASTORE_URI_RESOLVED", "${video.contentUri}")
 
-        // New video selection
+        // New video selection - do NOT prematurely flag isBuffering to prevent UI spinner flash
         _playbackState.update {
             it.copy(
                 currentVideo = video,
-                isBuffering = true,
+                isBuffering = false,
+                isFirstFrameRendered = false,
                 playbackError = null,
                 isUserPaused = false,
                 currentPositionMs = 0L,
@@ -192,8 +244,9 @@ class VScrollPlayerManager(
         }
 
         val mediaItem = MediaItem.fromUri(video.contentUri)
-        activePlayer.stop()
-        activePlayer.setMediaItem(mediaItem)
+        PlaybackTransitionTracer.markEvent("5. MEDIA_ITEM_ASSIGNED")
+        activePlayer.setMediaItem(mediaItem, /* resetPosition = */ true)
+        PlaybackTransitionTracer.markEvent("6. PLAYER_PREPARE_START")
         activePlayer.prepare()
         activePlayer.playWhenReady = true
         activePlayer.play()

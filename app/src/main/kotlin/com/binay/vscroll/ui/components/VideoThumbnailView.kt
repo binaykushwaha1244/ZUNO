@@ -31,6 +31,8 @@ fun VideoThumbnailView(
     videoId: Long,
     uri: Uri,
     modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    backgroundColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceVariant,
     placeholderTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
 ) {
     val context = LocalContext.current
@@ -46,7 +48,7 @@ fun VideoThumbnailView(
     }
 
     Box(
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier = modifier.background(backgroundColor),
         contentAlignment = Alignment.Center
     ) {
         Crossfade(targetState = bitmap, label = "ThumbnailFade") { currentBitmap ->
@@ -55,7 +57,7 @@ fun VideoThumbnailView(
                     bitmap = currentBitmap.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = contentScale
                 )
             } else {
                 Box(
