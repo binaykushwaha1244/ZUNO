@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -176,58 +177,69 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Horizontal Theme Swatches for quick selection
-                    Row(
+                    // 2-row Theme Swatches Grid for quick selection
+                    val themeRows = VScrollThemeMode.entries.chunked(3)
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        VScrollThemeMode.entries.forEach { mode ->
-                            val isSelected = mode == uiState.currentTheme
-                            val gradientColors = when (mode) {
-                                VScrollThemeMode.ZUNO -> listOf(Color(0xFF5935A8), Color(0xFF202443))
-                                VScrollThemeMode.OCEAN_POP -> listOf(Color(0xFF00629E), Color(0xFF00C9FF))
-                                VScrollThemeMode.SUNSET_GLOW -> listOf(Color(0xFFB84000), Color(0xFFFF8A65))
-                                VScrollThemeMode.FRESH_MINT -> listOf(Color(0xFF006C4C), Color(0xFF48CAE4))
-                                VScrollThemeMode.LAVENDER_DREAM -> listOf(Color(0xFF704E9A), Color(0xFFC77DFF))
-                                VScrollThemeMode.MIDNIGHT -> listOf(Color(0xFF1E293B), Color(0xFF0F172A))
-                            }
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { viewModel.setThemeMode(mode) }
-                                    .padding(4.dp)
+                        themeRows.forEach { rowThemes ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .clip(CircleShape)
-                                        .background(Brush.linearGradient(gradientColors))
-                                        .border(
-                                            width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
+                                rowThemes.forEach { mode ->
+                                    val isSelected = mode == uiState.currentTheme
+                                    val gradientColors = when (mode) {
+                                        VScrollThemeMode.ZUNO -> listOf(Color(0xFF5935A8), Color(0xFF202443))
+                                        VScrollThemeMode.OCEAN_POP -> listOf(Color(0xFF00629E), Color(0xFF00C9FF))
+                                        VScrollThemeMode.SUNSET_GLOW -> listOf(Color(0xFFB84000), Color(0xFFFF8A65))
+                                        VScrollThemeMode.FRESH_MINT -> listOf(Color(0xFF006C4C), Color(0xFF48CAE4))
+                                        VScrollThemeMode.LAVENDER_DREAM -> listOf(Color(0xFF704E9A), Color(0xFFC77DFF))
+                                        VScrollThemeMode.MIDNIGHT -> listOf(Color(0xFF1E293B), Color(0xFF0F172A))
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { viewModel.setThemeMode(mode) }
+                                            .padding(vertical = 4.dp, horizontal = 2.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(CircleShape)
+                                                .background(Brush.linearGradient(gradientColors))
+                                                .border(
+                                                    width = if (isSelected) 3.dp else 1.dp,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
+                                                    shape = CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Selected",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = mode.displayName,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = mode.displayName.split(" ").first(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
                     }

@@ -39,10 +39,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.binay.vscroll.data.player.PlaybackTransitionTracer
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.ui.components.VideoThumbnailView
 
@@ -65,11 +67,27 @@ fun VerticalVideoPager(
 
     // Synchronize current page changes with single ExoPlayer instance
     LaunchedEffect(pagerState) {
+        var lastPage = pagerState.currentPage
+        snapshotFlow { Pair(pagerState.isScrollInProgress, pagerState.targetPage) }
+            .collect { (inProgress, target) ->
+                if (inProgress && target != lastPage) {
+                    PlaybackTransitionTracer.startTransition(lastPage, target)
+                    PlaybackTransitionTracer.markEvent("2. PAGER_TARGET_PAGE_CHANGED", "target=$target")
+                }
+                if (!inProgress) {
+                    lastPage = pagerState.currentPage
+                }
+            }
+    }
+
+    LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }
             .collect { page ->
                 val video = videos.getOrNull(page)
                 if (video != null) {
+                    PlaybackTransitionTracer.markEvent("2. PAGER_CURRENT_PAGE_SETTLED", "page=$page")
                     playerViewModel.playVideo(video)
+                    playerViewModel.preloadNextVideo(videos.getOrNull(page + 1))
                     onIndexChanged(page)
                 }
             }
@@ -86,8 +104,15 @@ fun VerticalVideoPager(
     val animState by playerViewModel.animState.collectAsStateWithLifecycle()
     val isCleanMode by playerViewModel.isCleanViewingMode.collectAsStateWithLifecycle()
 
+    LaunchedEffect(playbackState.isFirstFrameRendered) {
+        if (playbackState.isFirstFrameRendered) {
+            PlaybackTransitionTracer.markEvent("11. THUMBNAIL_HIDDEN")
+        }
+    }
+
     VerticalPager(
         state = pagerState,
+        beyondViewportPageCount = 1,
         key = { page -> videos.getOrNull(page)?.id ?: page.toLong() },
         modifier = modifier
             .fillMaxSize()
@@ -102,11 +127,17 @@ fun VerticalVideoPager(
                 .background(Color.Black)
         ) {
             // Layer 1: Persistent Background Thumbnail View (prevents black flash during swipes)
-            VideoThumbnailView(
-                videoId = video.id,
-                uri = video.contentUri,
-                modifier = Modifier.fillMaxSize()
-            )
+            // Displays with exact ContentScale.Fit until live frame is rendered
+            val isLiveRendered = isCurrentPage && playbackState.isFirstFrameRendered
+            if (!isLiveRendered) {
+                VideoThumbnailView(
+                    videoId = video.id,
+                    uri = video.contentUri,
+                    contentScale = ContentScale.Fit,
+                    backgroundColor = Color.Black,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             // Layer 2: Live Video Surface (attached only when page is current active item)
             if (isCurrentPage) {

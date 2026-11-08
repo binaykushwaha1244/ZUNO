@@ -70,6 +70,11 @@ graph LR
   4. **Fresh Mint:** Mint green, emerald, lively white.
   5. **Lavender Dream:** Royal lavender, violet, soft pink.
   6. **Midnight (Dark):** Obsidian black, electric cyan, violet.
+- **Responsive 2-Row Theme Selector Grid:** Settings provides an ergonomic 2-row layout (3 themes per row) with 46dp gradient swatches, checkmark selection indicators, and unclipped, non-wrapping labels.
 - **Theme Persistence:** Stored persistently using Jetpack DataStore; loads immediately upon app cold start.
 - **Clean Viewing Mode:** One-tap distraction-free playback hiding all buttons and overlays.
+- **Hardware-Decoded High-Fidelity Video Engine:**
+  - Full native resolution preservation from 480p up to 4K 2160p (AV1/HEVC/AVC).
+  - Frictionless swipe transition with preloaded adjacent thumbnails and decoder retention.
+
 

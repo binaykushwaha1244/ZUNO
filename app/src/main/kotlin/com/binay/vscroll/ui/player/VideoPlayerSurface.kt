@@ -13,6 +13,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.binay.vscroll.data.player.PlaybackTransitionTracer
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -22,9 +23,11 @@ fun VideoPlayerSurface(
 ) {
     AndroidView(
         factory = { ctx ->
+            PlaybackTransitionTracer.markEvent("9. SURFACE_ATTACHED (new PlayerView factory)")
             PlayerView(ctx).apply {
                 useController = false
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
@@ -33,6 +36,7 @@ fun VideoPlayerSurface(
             }
         },
         update = { view ->
+            PlaybackTransitionTracer.markEvent("9. SURFACE_ATTACHED (update PlayerView)")
             if (view.player != exoPlayer) {
                 view.player = exoPlayer
             }

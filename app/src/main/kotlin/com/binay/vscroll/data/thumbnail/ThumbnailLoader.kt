@@ -30,8 +30,8 @@ object ThumbnailLoader {
         context: Context,
         videoId: Long,
         uri: Uri,
-        width: Int = 480,
-        height: Int = 320
+        width: Int = 720,
+        height: Int = 1280
     ): Bitmap? = withContext(Dispatchers.IO) {
         // Fast path: memory cache
         memoryCache.get(videoId)?.let { return@withContext it }

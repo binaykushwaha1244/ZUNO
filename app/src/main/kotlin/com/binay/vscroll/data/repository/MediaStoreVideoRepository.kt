@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.util.Log
 import com.binay.vscroll.domain.model.FolderItem
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.domain.model.VideoSortOrder
@@ -29,10 +30,19 @@ class MediaStoreVideoRepository(
     private val contentResolver = context.contentResolver
     private val refreshTrigger = MutableStateFlow(0L)
 
+    @Volatile
+    private var cachedVideos: List<VideoItem>? = null
+    @Volatile
+    private var cachedSortOrder: VideoSortOrder? = null
+    @Volatile
+    private var lastQueryTimestamp: Long = 0L
+
     // Flow that observes MediaStore content changes and emits whenever local storage updates
     private val mediaStoreChangeFlow: Flow<Unit> = callbackFlow {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
+                cachedVideos = null
+                lastQueryTimestamp = 0L
                 trySend(Unit)
             }
         }
@@ -72,12 +82,30 @@ class MediaStoreVideoRepository(
     }
 
     override suspend fun refreshVideos() = withContext(Dispatchers.IO) {
-        // Triggers query update across active subscribers immediately
+        // Invalidate in-memory cache to force a fresh query across active subscribers
+        cachedVideos = null
+        lastQueryTimestamp = 0L
         refreshTrigger.value = System.currentTimeMillis()
     }
 
+    private fun sortVideos(videos: List<VideoItem>, sortOrder: VideoSortOrder): List<VideoItem> {
+        return when (sortOrder) {
+            VideoSortOrder.NEWEST_FIRST -> videos.sortedByDescending { it.dateAdded }
+            VideoSortOrder.OLDEST_FIRST -> videos.sortedBy { it.dateAdded }
+            VideoSortOrder.NAME_A_TO_Z -> videos.sortedBy { it.title.lowercase() }
+            VideoSortOrder.LARGEST_FIRST -> videos.sortedByDescending { it.sizeBytes }
+            VideoSortOrder.DURATION_LONGEST -> videos.sortedByDescending { it.durationMillis }
+        }
+    }
+
     private fun queryMediaStoreVideos(sortOrder: VideoSortOrder): List<VideoItem> {
-        val videoList = mutableListOf<VideoItem>()
+        val now = System.currentTimeMillis()
+        val cached = cachedVideos
+        if (cached != null && (now - lastQueryTimestamp) < 1200L) {
+            return if (cachedSortOrder == sortOrder) cached else sortVideos(cached, sortOrder)
+        }
+
+        val startTime = System.currentTimeMillis()
 
         val projection = mutableListOf(
             MediaStore.Video.Media._ID,
@@ -108,6 +136,7 @@ class MediaStoreVideoRepository(
         }
 
         val selection = "${MediaStore.Video.Media.SIZE} > 0"
+        var videoList: ArrayList<VideoItem> = ArrayList()
 
         try {
             val cursor = contentResolver.query(
@@ -119,6 +148,8 @@ class MediaStoreVideoRepository(
             )
 
             cursor?.use { c ->
+                val count = c.count
+                videoList = ArrayList(count)
                 val idCol = c.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
                 val nameCol = c.getColumnIndex(MediaStore.Video.Media.DISPLAY_NAME)
                 val durationCol = c.getColumnIndex(MediaStore.Video.Media.DURATION)
@@ -196,11 +227,26 @@ class MediaStoreVideoRepository(
             // Gracefully return whatever was read if security exception or query failure
         }
 
+        val elapsed = System.currentTimeMillis() - startTime
+        Log.d("ZUNO_PERF", "MediaStore query: ${videoList.size} videos retrieved in ${elapsed}ms (sort=$sortOrder)")
+        cachedVideos = videoList
+        cachedSortOrder = sortOrder
+        lastQueryTimestamp = System.currentTimeMillis()
+
         return videoList
     }
 
     private fun groupVideosIntoFolders(videos: List<VideoItem>): List<FolderItem> {
-        val folderMap = mutableMapOf<String, MutableList<VideoItem>>()
+        val groupStart = System.currentTimeMillis()
+        class FolderAccumulator(
+            val id: String,
+            val folderName: String,
+            var count: Int = 0,
+            var coverVideoId: Long? = null,
+            var coverVideoUri: String? = null
+        )
+
+        val folderMap = LinkedHashMap<String, FolderAccumulator>()
 
         for (video in videos) {
             val key = if (video.relativePath.isNotBlank()) {
@@ -208,23 +254,33 @@ class MediaStoreVideoRepository(
             } else {
                 video.folderName
             }
-            folderMap.getOrPut(key) { mutableListOf() }.add(video)
+            val acc = folderMap.getOrPut(key) {
+                val folderName = video.folderName.ifBlank { key.substringAfterLast('/') }.ifBlank { "Internal" }
+                FolderAccumulator(
+                    id = key,
+                    folderName = folderName,
+                    count = 0,
+                    coverVideoId = video.id,
+                    coverVideoUri = video.uriString
+                )
+            }
+            acc.count++
         }
 
-        return folderMap.map { (key, folderVideos) ->
-            val firstVideo = folderVideos.firstOrNull()
-            val folderName = firstVideo?.folderName?.ifBlank { key.substringAfterLast('/') }
-                ?: key.substringAfterLast('/')
-
+        val result = folderMap.values.map { acc ->
             FolderItem(
-                id = key,
-                name = folderName,
-                relativePath = key,
-                videoCount = folderVideos.size,
-                coverVideoId = firstVideo?.id,
-                coverVideoUri = firstVideo?.uriString
+                id = acc.id,
+                name = acc.folderName,
+                relativePath = acc.id,
+                videoCount = acc.count,
+                coverVideoId = acc.coverVideoId,
+                coverVideoUri = acc.coverVideoUri
             )
         }.sortedByDescending { it.videoCount }
+
+        val elapsed = System.currentTimeMillis() - groupStart
+        Log.d("ZUNO_PERF", "Grouped ${videos.size} videos into ${result.size} folders in ${elapsed}ms")
+        return result
     }
 }
 
