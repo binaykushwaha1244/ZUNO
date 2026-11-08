@@ -415,3 +415,4 @@ Contributions are welcome! Please follow these standards:
 - [docs/PRIVACY_AND_PERMISSIONS.md](docs/PRIVACY_AND_PERMISSIONS.md) — Privacy manifesto and Scoped Storage security model.
 - [docs/BRANDING.md](docs/BRANDING.md) — Brand guidelines, geometry, and design tokens.
 - [docs/TESTING.md](docs/TESTING.md) — Automated test suite specifications and device verification matrix.
+

@@ -111,3 +111,4 @@ erDiagram
 - **Background Execution:** All DAO queries execute off the main thread via Room coroutines (`suspend`) or Kotlin `Flow`.
 - **Compound Indices:** Indexed on `(date_string, media_store_id)` and `(collection_id, media_store_id)` for sub-millisecond query responses across 10,000+ videos.
 - **Reactive Updates:** All UI screens observe Room database tables reactively using Room `Flow` queries combined with Kotlin Coroutines `StateFlow`.
+

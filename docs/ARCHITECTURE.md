@@ -79,3 +79,4 @@ graph TD
 3. **Queue Isolation:** When the user enters playback, the active queue is determined by context (`GLOBAL_RANDOM`, `FOLDER_SEQUENTIAL`, or `COLLECTION_SEQUENTIAL`), ensuring users stay within their intended scope.
 4. **Watch Tracking:** Foreground playback ticks are captured by `PlaybackWatchTimeTracker` and flushed every 5 seconds to `daily_watch_records`.
 5. **Viewing Reminders:** `ViewingReminderManager` evaluates accumulated daily watch time against the user's selected interval and dispatches a gentle local notification when reached.
+

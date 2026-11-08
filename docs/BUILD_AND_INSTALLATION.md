@@ -108,3 +108,4 @@ To install ZUNO on any other physical Android device without a development envir
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | The existing app on device was signed with a different debug certificate. | Verify the debug keystore is consistent. |
 | Videos not appearing in grid | Storage permission not granted. | Open Android Settings $\rightarrow$ Apps $\rightarrow$ ZUNO $\rightarrow$ Permissions $\rightarrow$ Enable "Photos and Videos". |
 | Viewing reminder notification not showing | Notification permission denied on Android 13+. | Open Android Settings $\rightarrow$ Apps $\rightarrow$ ZUNO $\rightarrow$ Notifications $\rightarrow$ Toggle ON. |
+

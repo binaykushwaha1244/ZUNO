@@ -34,3 +34,4 @@ ZUNO requests only the minimal permissions required to discover and play local v
    - When sharing a video via the Android sharesheet, temporary URI read permissions are granted strictly to the target application via `androidx.core.content.FileProvider`.
 3. **No Unsolicited Background Processing:**
    - Playback ceases immediately upon app backgrounding or screen lock. No foreground services, wakelocks, or persistent background tasks remain active when the app is closed.
+
