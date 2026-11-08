@@ -69,3 +69,4 @@ In addition to the signature **ZUNO** default theme, the application supports fi
 4. **Fresh Mint:** Mint green, emerald & lively white.
 5. **Lavender Dream:** Royal lavender, violet & soft pink.
 6. **Midnight (Dark):** Obsidian black, electric cyan & violet.
+

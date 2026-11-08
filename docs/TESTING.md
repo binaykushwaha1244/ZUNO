@@ -46,3 +46,4 @@ All releases are verified on a connected physical hardware device:
   4. **Queue Isolation:** Swiped through folder view and confirmed 100% isolation within folder bounds.
   5. **Room Database Integrity:** Verified all 1,818 local videos, 3 Likes, 2 Saves, 1 Note, and 9 watch sessions remained intact after in-place APK installation.
   6. **Airplane Mode:** Verified full offline playback and interaction recording while disconnected from all mobile data and Wi-Fi networks.
+

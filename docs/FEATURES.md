@@ -72,3 +72,4 @@ graph LR
   6. **Midnight (Dark):** Obsidian black, electric cyan, violet.
 - **Theme Persistence:** Stored persistently using Jetpack DataStore; loads immediately upon app cold start.
 - **Clean Viewing Mode:** One-tap distraction-free playback hiding all buttons and overlays.
+

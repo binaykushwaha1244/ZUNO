@@ -69,3 +69,4 @@ A critical architectural feature of ZUNO is strict queue isolation. When viewing
 Clean Viewing Mode removes all distracting UI elements (interaction buttons, video titles, folder badges, and navigation bars) to provide an unobstructed video watching experience.
 - Can be toggled from the player overlay button or via the Settings tab.
 - Preference is persistently saved in DataStore.
+
