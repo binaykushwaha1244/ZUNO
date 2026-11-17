@@ -76,13 +76,13 @@ ZUNO treats short video viewing with respect: rather than gamifying your watch t
 
 ## 4. Visual Previews & Screenshots
 
-| Shorts Explore Grid | Immersive Video Player | Activity & Break Reminders |
+| Immersive Video Player | Activity & Break Reminders | Settings & About ZUNO |
 | :---: | :---: | :---: |
-| <img src="docs/assets/screenshots/zuno-shorts-grid.png" width="240" alt="Shorts Explore Grid"> | <img src="docs/assets/screenshots/zuno-player.png" width="240" alt="Video Player"> | <img src="docs/assets/screenshots/zuno-activity-reminders.png" width="240" alt="Activity Analytics"> |
+| <img src="docs/assets/screenshots/zuno-player.png" width="240" alt="Video Player"> | <img src="docs/assets/screenshots/zuno-activity-reminders.png" width="240" alt="Activity Analytics"> | <img src="docs/assets/screenshots/zuno-settings-about.png" width="240" alt="Settings & About"> |
 
-| Library & Collections | Settings & About ZUNO | Launcher Icon Preview |
+| Master Brand Symbol | Brand Palette Guide | Launcher Icon Preview |
 | :---: | :---: | :---: |
-| <img src="docs/assets/screenshots/zuno-library.png" width="240" alt="Library All Tab"> | <img src="docs/assets/screenshots/zuno-settings-about.png" width="240" alt="Settings & About"> | <img src="docs/assets/branding/zuno-launcher-preview.png" width="240" alt="Launcher Icon"> |
+| <img src="docs/assets/branding/zuno-master-symbol.png" width="240" alt="Master Brand Symbol"> | <img src="docs/assets/branding/zuno-brand-palette.png" width="240" alt="Brand Palette Guide"> | <img src="docs/assets/branding/zuno-launcher-preview.png" width="240" alt="Launcher Icon"> |
 
 ---
 
