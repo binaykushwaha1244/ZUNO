@@ -51,6 +51,8 @@ class FakeDailyRecordDaoForReminder : DailyWatchRecordDao {
     override suspend fun updateExisting(dateString: String, mediaStoreId: Long, additionalWatchTimeMs: Long, additionalSessions: Int, lastWatchedAt: Long): Int = 1
     override fun observeBreakdownFromDate(startDateString: String): Flow<List<DailyBreakdownProjection>> = flowOf(emptyList())
     override fun observeRangeSummary(startDateString: String): Flow<DailySummaryProjection?> = flowOf(null)
+    override fun observeRecordsForDate(dateString: String): Flow<List<DailyWatchRecordEntity>> = flowOf(emptyList())
+    override suspend fun getRecordsForDateSync(dateString: String): List<DailyWatchRecordEntity> = emptyList()
     override suspend fun deleteForVideo(mediaStoreId: Long): Int = 0
     override suspend fun clearAllDailyRecords(): Int = 0
 }

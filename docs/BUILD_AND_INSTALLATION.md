@@ -54,7 +54,7 @@ Output APK location:
 
 ## 4. How to Run Automated Unit Tests
 
-To run the complete test suite (102 unit tests covering Room migrations, queue management, player watch telemetry, viewing reminders, first-frame playback transitions, and theme modes):
+To run the complete test suite (122 unit tests covering Room migrations, queue management, player watch telemetry, viewing reminders, first-frame playback transitions, 6 emoji reactions, dismissal overlay management, and theme modes):
 - **Windows (PowerShell):**
   ```powershell
   .\gradlew.bat test
@@ -94,8 +94,8 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 To install ZUNO on any other physical Android device without a development environment:
 
 1. Copy the standalone APK from `D:\Projects\ZUNO-Release\ZUNO-debug.apk` to the target device (via USB cable, Local Send, or file manager).
-   - **File Size:** 25,258,049 bytes (24.08 MB)
-   - **SHA-256:** `468DF141D8D3CB706BD44176FAF93F89B2D3523B3E2AF79EB7FC8CCAED45591A`
+   - **File Size:** 25,657,623 bytes (24.47 MB)
+   - **SHA-256:** `28FE934DC18BEAE3EF3A66167ED5A3790C56958C97C07E72CD867B0CA5F00081`
 2. On the target device, tap the APK file in the Files application.
 3. If prompted by Android, enable **Install unknown apps** for the file manager.
 4. Tap **Install**.

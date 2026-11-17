@@ -50,8 +50,15 @@ graph TD
 ### A. UI Layer (`com.binay.vscroll.ui`)
 - **Jetpack Compose & Material 3:** Declarative UI built exclusively with Compose composables.
 - **Single Activity Architecture:** Hosted in `MainActivity.kt`, routed via Compose Navigation.
-- **Dynamic Theming:** Dynamic color scheme animation (`VScrollTheme`) observing preferences via `StateFlow`.
-- **Gesture Architecture:** Vertical swipe for feed navigation, horizontal drag for progress seeking, left/right vertical drags for brightness and volume HUDs, double-tap for animated likes.
+- **Dynamic Theming:** Dynamic color scheme animation (`VScrollTheme`) observing preferences via `StateFlow` across 5 curated themes.
+- **Gesture Architecture:** Vertical swipe for feed navigation, horizontal drag for progress seeking, left/right vertical drags for brightness and volume HUDs, double-tap for animated likes with localized heart pop, long-press for emoji reaction rail, and directional horizontal tab swiping with aspect-ratio gesture disambiguation (`absX > absY * 1.5f`).
+- **Playback Social Rail (`PlaybackSocialRail`):** Unified social interaction rail encapsulating single-tap like, long-press 6-emoji reaction selector, automated hiding of Notes/Save/Share controls during reaction selection, full-screen outside-tap dismissal scrim, and BackHandler dismissal across all playback modes (`ShortsScreen`, `FolderPlaybackScreen`, `InteractionPlaybackScreen`).
+- **Tab State Preservation:** Root navigation employs `rememberSaveableStateHolder().SaveableStateProvider(key = destination.name)` and `AnimatedContent` horizontal slide transitions across all five tabs.
+- **Saved Collections Experience:** `SavedVideosScreen` with dual `All Saved` & `Collections` tabs, 1:1 square collection cards, dedicated collection drilldown, and `SaveToCollectionSheet` for multi-collection tagging.
+- **Video Details Bottom Sheet:** `VideoDetailsBottomSheet` displaying full metadata (resolution, dimensions, duration, folder, storage size, path, date added) and sequential playback triggers.
+- **About ZUNO Screen (`AboutZunoScreen`):** Dedicated settings destination presenting app identity, core features, privacy guarantees, open-source licenses, and expandable build parameters with backstack handling.
+- **Reusable Empty States (`EmptyStateView`):** Theme-aware empty state component deployed across Library folders, collections, search results, and interaction tabs.
+- **Daily Screen-Time Detail Experience:** Interactive 7-day bar chart with day selection, chronological viewing timeline, and day-by-day navigation.
 
 ### B. ViewModel Layer (`com.binay.vscroll.ui.*`)
 - **`HomeViewModel`:** Coordinates media discovery, virtual collections, physical folders, multi-select batch actions, and theme settings.

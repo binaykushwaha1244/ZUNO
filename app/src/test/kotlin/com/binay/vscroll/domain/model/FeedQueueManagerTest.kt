@@ -357,4 +357,81 @@ class FeedQueueManagerTest {
             assertTrue(dest.route.isNotBlank())
         }
     }
+
+    @Test
+    fun interactionPlayback_likedSequentialMaintainsIsolatedQueue() = runTest {
+        val fakeRepo = FakeVideoRepository()
+        val manager = FeedQueueManager(fakeRepo, backgroundScope)
+
+        assertNull(manager.interactionQueue.value)
+
+        val likedVideos = listOf(
+            VideoItem(id = 101L, title = "Liked Reel 1.mp4", uriString = "c://101"),
+            VideoItem(id = 102L, title = "Liked Reel 2.mp4", uriString = "c://102"),
+            VideoItem(id = 103L, title = "Liked Reel 3.mp4", uriString = "c://103")
+        )
+
+        // Start playback from index 1 (Liked Reel 2)
+        manager.startInteractionPlayback(
+            source = InteractionSource.LIKED,
+            videos = likedVideos,
+            initialIndex = 1
+        )
+
+        val queueState = manager.interactionQueue.value
+        assertNotNull(queueState)
+        assertEquals(3, queueState?.items?.size)
+        assertEquals(1, queueState?.currentIndex)
+        assertEquals(102L, queueState?.currentVideo?.id)
+        assertTrue(queueState?.context is PlaybackContext.InteractionSequential)
+        val ctx = queueState?.context as PlaybackContext.InteractionSequential
+        assertEquals(InteractionSource.LIKED, ctx.source)
+        assertEquals(102L, ctx.initialVideoId)
+
+        // Advance to next video in interaction queue
+        manager.updateInteractionIndex(2)
+        assertEquals(2, manager.interactionQueue.value?.currentIndex)
+        assertEquals(103L, manager.interactionQueue.value?.currentVideo?.id)
+
+        // Swiping past end clamps safely
+        manager.updateInteractionIndex(10)
+        assertEquals(2, manager.interactionQueue.value?.currentIndex)
+
+        // Closing interaction playback resets queue to null
+        manager.closeInteractionPlayback()
+        assertNull(manager.interactionQueue.value)
+    }
+
+    @Test
+    fun interactionPlayback_savedAndNotesSourcesWorkEqually() = runTest {
+        val fakeRepo = FakeVideoRepository()
+        val manager = FeedQueueManager(fakeRepo, backgroundScope)
+
+        val savedVideos = listOf(
+            VideoItem(id = 201L, title = "Saved Tutorial.mp4", uriString = "c://201")
+        )
+
+        manager.startInteractionPlayback(
+            source = InteractionSource.SAVED,
+            videos = savedVideos,
+            initialIndex = 0
+        )
+        val savedQueue = manager.interactionQueue.value
+        assertEquals(InteractionSource.SAVED, (savedQueue?.context as PlaybackContext.InteractionSequential).source)
+        assertEquals(201L, savedQueue.currentVideo?.id)
+        manager.closeInteractionPlayback()
+
+        val noteVideos = listOf(
+            VideoItem(id = 301L, title = "Lecture With Notes.mp4", uriString = "c://301")
+        )
+        manager.startInteractionPlayback(
+            source = InteractionSource.NOTES,
+            videos = noteVideos,
+            initialIndex = 0
+        )
+        val noteQueue = manager.interactionQueue.value
+        assertEquals(InteractionSource.NOTES, (noteQueue?.context as PlaybackContext.InteractionSequential).source)
+        assertEquals(301L, noteQueue.currentVideo?.id)
+        manager.closeInteractionPlayback()
+    }
 }

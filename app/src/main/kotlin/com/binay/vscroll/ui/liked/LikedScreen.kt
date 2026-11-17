@@ -66,18 +66,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.binay.vscroll.data.repository.FeedQueueManager
+import com.binay.vscroll.domain.model.InteractionSource
 import com.binay.vscroll.domain.model.UserNoteItem
 import com.binay.vscroll.domain.model.UserVideoItem
 import com.binay.vscroll.domain.model.VideoItem
+import com.binay.vscroll.domain.repository.CollectionRepository
 import com.binay.vscroll.ui.components.VideoThumbnailView
 import com.binay.vscroll.ui.player.NotesBottomSheet
+import com.binay.vscroll.ui.saved.SavedVideosScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LikedScreen(
     viewModel: LikedViewModel,
-    onPlayVideo: (VideoItem) -> Unit,
-    modifier: Modifier = Modifier
+    onPlayInteraction: (InteractionSource, List<VideoItem>, Int) -> Unit,
+    modifier: Modifier = Modifier,
+    collectionRepository: CollectionRepository? = null,
+    feedQueueManager: FeedQueueManager? = null
 ) {
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -264,6 +270,7 @@ fun LikedScreen(
                             description = if (searchQuery.isNotEmpty()) "No liked videos match '$searchQuery'." else "Tap the heart icon while watching any video in Shorts to save it to your offline favorites."
                         )
                     } else {
+                        val eligibleLikedVideos = remember(likedVideos) { likedVideos.mapNotNull { it.videoItem } }
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             contentPadding = PaddingValues(4.dp),
@@ -276,7 +283,13 @@ fun LikedScreen(
                                     item = item,
                                     badgeIcon = Icons.Default.Favorite,
                                     badgeTint = Color(0xFFFF2A55),
-                                    onPlay = { item.videoItem?.let(onPlayVideo) },
+                                    badgeEmoji = item.reaction?.emoji,
+                                    onPlay = {
+                                        val idx = eligibleLikedVideos.indexOfFirst { it.id == item.mediaStoreId }
+                                        if (idx >= 0) {
+                                            onPlayInteraction(InteractionSource.LIKED, eligibleLikedVideos, idx)
+                                        }
+                                    },
                                     onRemove = { viewModel.unlike(item) }
                                 )
                             }
@@ -284,30 +297,48 @@ fun LikedScreen(
                     }
                 }
                 1 -> {
-                    // Saved/Bookmarked Videos Grid
-                    if (savedVideos.isEmpty()) {
-                        EmptyStateView(
-                            icon = Icons.Default.BookmarkBorder,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            title = if (searchQuery.isNotEmpty()) "No Matching Bookmarks" else "No Saved Videos Yet",
-                            description = if (searchQuery.isNotEmpty()) "No bookmarks match '$searchQuery'." else "Tap the bookmark icon in the video player or Shorts screen to bookmark videos for quick offline access."
+                    // Saved/Bookmarked Videos and Collections (Instagram-Inspired Experience)
+                    if (collectionRepository != null && feedQueueManager != null) {
+                        SavedVideosScreen(
+                            viewModel = viewModel,
+                            collectionRepository = collectionRepository,
+                            feedQueueManager = feedQueueManager,
+                            onBack = {},
+                            onPlayInteraction = onPlayInteraction,
+                            showTopBar = false
                         )
                     } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(3),
-                            contentPadding = PaddingValues(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(savedVideos, key = { it.mediaStoreId }) { item ->
-                                InteractionThumbnailCard(
-                                    item = item,
-                                    badgeIcon = Icons.Default.Bookmark,
-                                    badgeTint = MaterialTheme.colorScheme.primary,
-                                    onPlay = { item.videoItem?.let(onPlayVideo) },
-                                    onRemove = { viewModel.removeBookmark(item) }
-                                )
+                        // Fallback Grid
+                        if (savedVideos.isEmpty()) {
+                            EmptyStateView(
+                                icon = Icons.Default.BookmarkBorder,
+                                iconTint = MaterialTheme.colorScheme.primary,
+                                title = if (searchQuery.isNotEmpty()) "No Matching Bookmarks" else "No Saved Videos Yet",
+                                description = if (searchQuery.isNotEmpty()) "No bookmarks match '$searchQuery'." else "Tap the bookmark icon in the video player or Shorts screen to bookmark videos for quick offline access."
+                            )
+                        } else {
+                            val eligibleSavedVideos = remember(savedVideos) { savedVideos.mapNotNull { it.videoItem } }
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(3),
+                                contentPadding = PaddingValues(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(savedVideos, key = { it.mediaStoreId }) { item ->
+                                    InteractionThumbnailCard(
+                                        item = item,
+                                        badgeIcon = Icons.Default.Bookmark,
+                                        badgeTint = MaterialTheme.colorScheme.primary,
+                                        onPlay = {
+                                            val idx = eligibleSavedVideos.indexOfFirst { it.id == item.mediaStoreId }
+                                            if (idx >= 0) {
+                                                onPlayInteraction(InteractionSource.SAVED, eligibleSavedVideos, idx)
+                                            }
+                                        },
+                                        onRemove = { viewModel.removeBookmark(item) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -322,6 +353,7 @@ fun LikedScreen(
                             description = if (searchQuery.isNotEmpty()) "No notes match '$searchQuery'." else "Tap the Notes icon on any video in the player to write private personal thoughts, study notes, or timestamps."
                         )
                     } else {
+                        val eligibleNotesVideos = remember(notes) { notes.mapNotNull { it.videoItem } }
                         LazyColumn(
                             contentPadding = PaddingValues(12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -330,7 +362,12 @@ fun LikedScreen(
                             items(notes, key = { it.mediaStoreId }) { noteItem ->
                                 NoteCard(
                                     note = noteItem,
-                                    onPlay = { noteItem.videoItem?.let(onPlayVideo) },
+                                    onPlay = {
+                                        val idx = eligibleNotesVideos.indexOfFirst { it.id == noteItem.mediaStoreId }
+                                        if (idx >= 0) {
+                                            onPlayInteraction(InteractionSource.NOTES, eligibleNotesVideos, idx)
+                                        }
+                                    },
                                     onEdit = {
                                         val v = noteItem.videoItem ?: VideoItem(
                                             id = noteItem.mediaStoreId,
@@ -386,7 +423,8 @@ private fun InteractionThumbnailCard(
     badgeTint: Color,
     onPlay: () -> Unit,
     onRemove: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    badgeEmoji: String? = null
 ) {
     Card(
         shape = RoundedCornerShape(4.dp),
@@ -478,12 +516,19 @@ private fun InteractionThumbnailCard(
                     modifier = Modifier.size(24.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = badgeIcon,
-                            contentDescription = null,
-                            tint = badgeTint,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        if (!badgeEmoji.isNullOrBlank()) {
+                            Text(
+                                text = badgeEmoji,
+                                fontSize = 13.sp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = badgeIcon,
+                                contentDescription = null,
+                                tint = badgeTint,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
                 }
 
@@ -541,19 +586,6 @@ private fun NoteCard(
                             uri = note.videoItem.contentUri,
                             modifier = Modifier.fillMaxSize()
                         )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Play",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     } else {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -571,7 +603,11 @@ private fun NoteCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = note.isAvailable, onClick = onPlay)
+                ) {
                     Text(
                         text = note.title,
                         style = MaterialTheme.typography.titleSmall,
@@ -582,7 +618,7 @@ private fun NoteCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "📁 ${note.folderName} • ${UserVideoItem.formatMillis(note.durationMillis)}",
+                        text = UserVideoItem.formatMillis(note.durationMillis),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp

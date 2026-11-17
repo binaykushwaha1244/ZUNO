@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Info
@@ -49,6 +50,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +73,16 @@ fun SettingsScreen(
     viewModel: HomeViewModel,
     modifier: Modifier = Modifier
 ) {
+    var isAboutScreenVisible by rememberSaveable { mutableStateOf(false) }
+
+    if (isAboutScreenVisible) {
+        AboutZunoScreen(
+            onBack = { isAboutScreenVisible = false },
+            modifier = modifier
+        )
+        return
+    }
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val cleanModeEnabled by viewModel.isCleanViewingMode.collectAsStateWithLifecycle()
@@ -177,69 +189,60 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2-row Theme Swatches Grid for quick selection
-                    val themeRows = VScrollThemeMode.entries.chunked(3)
-                    Column(
+                    // Theme Swatches Row for quick selection (5 curated themes)
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        themeRows.forEach { rowThemes ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                rowThemes.forEach { mode ->
-                                    val isSelected = mode == uiState.currentTheme
-                                    val gradientColors = when (mode) {
-                                        VScrollThemeMode.ZUNO -> listOf(Color(0xFF5935A8), Color(0xFF202443))
-                                        VScrollThemeMode.OCEAN_POP -> listOf(Color(0xFF00629E), Color(0xFF00C9FF))
-                                        VScrollThemeMode.SUNSET_GLOW -> listOf(Color(0xFFB84000), Color(0xFFFF8A65))
-                                        VScrollThemeMode.FRESH_MINT -> listOf(Color(0xFF006C4C), Color(0xFF48CAE4))
-                                        VScrollThemeMode.LAVENDER_DREAM -> listOf(Color(0xFF704E9A), Color(0xFFC77DFF))
-                                        VScrollThemeMode.MIDNIGHT -> listOf(Color(0xFF1E293B), Color(0xFF0F172A))
-                                    }
+                        VScrollThemeMode.entries.forEach { mode ->
+                            val isSelected = mode == uiState.currentTheme
+                            val gradientColors = when (mode) {
+                                VScrollThemeMode.ZUNO -> listOf(Color(0xFF5935A8), Color(0xFF202443))
+                                VScrollThemeMode.SUNSET_GLOW -> listOf(Color(0xFFB84000), Color(0xFFFF8A65))
+                                VScrollThemeMode.FRESH_MINT -> listOf(Color(0xFF006C4C), Color(0xFF48CAE4))
+                                VScrollThemeMode.LAVENDER_DREAM -> listOf(Color(0xFF704E9A), Color(0xFFC77DFF))
+                                VScrollThemeMode.MIDNIGHT -> listOf(Color(0xFF1E293B), Color(0xFF0F172A))
+                            }
 
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable { viewModel.setThemeMode(mode) }
-                                            .padding(vertical = 4.dp, horizontal = 2.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(46.dp)
-                                                .clip(CircleShape)
-                                                .background(Brush.linearGradient(gradientColors))
-                                                .border(
-                                                    width = if (isSelected) 3.dp else 1.dp,
-                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
-                                                    shape = CircleShape
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (isSelected) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Check,
-                                                    contentDescription = "Selected",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = mode.displayName,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 1
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.setThemeMode(mode) }
+                                    .padding(vertical = 4.dp, horizontal = 1.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(Brush.linearGradient(gradientColors))
+                                        .border(
+                                            width = if (isSelected) 3.dp else 1.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
+                                            shape = CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = mode.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
@@ -361,56 +364,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Offline Guarantee & Privacy Card
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
-                ),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.CloudOff,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
-                        Text(
-                            text = "100% Offline & Private",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "No internet required. No cloud uploads. No advertisements. Your videos and activity stay solely on this device.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // About Section
+            // About Section (Navigates to dedicated About ZUNO Screen)
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -418,39 +372,60 @@ fun SettingsScreen(
                     1.dp,
                     MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { isAboutScreenVisible = true }
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp)
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "About ZUNO",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Text(
+                                text = "About ZUNO",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Version 1.0 • Features, Privacy & Licenses",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "ZUNO — Short-Form Social Video Discovery Platform\nVersion 1.0.0 (Production Release)\nPackage: com.binay.vscroll",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 18.sp
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = "Open About ZUNO",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }

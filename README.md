@@ -10,10 +10,10 @@
   <a href="#technology-stack"><img src="https://img.shields.io/badge/Kotlin-2.0.21-purple.svg?style=flat-square" alt="Kotlin"></a>
   <a href="#technology-stack"><img src="https://img.shields.io/badge/Jetpack_Compose-Material_3-blue.svg?style=flat-square" alt="Jetpack Compose"></a>
   <a href="#technology-stack"><img src="https://img.shields.io/badge/Media3-ExoPlayer-orange.svg?style=flat-square" alt="Media3"></a>
-  <a href="#technology-stack"><img src="https://img.shields.io/badge/Room_Database-v4-emerald.svg?style=flat-square" alt="Room Database"></a>
+  <a href="#technology-stack"><img src="https://img.shields.io/badge/Room_Database-v5-emerald.svg?style=flat-square" alt="Room Database"></a>
   <a href="#technology-stack"><img src="https://img.shields.io/badge/Target_SDK-37-red.svg?style=flat-square" alt="Target SDK"></a>
   <a href="#privacy-and-offline-philosophy"><img src="https://img.shields.io/badge/Privacy-100%25_Offline-success.svg?style=flat-square" alt="100% Offline"></a>
-  <a href="#automated-testing"><img src="https://img.shields.io/badge/Tests-102%20Passed-brightgreen.svg?style=flat-square" alt="102 Tests Passed"></a>
+  <a href="#automated-testing"><img src="https://img.shields.io/badge/Tests-121%20Passed-brightgreen.svg?style=flat-square" alt="121 Tests Passed"></a>
 </p>
 
 ---
@@ -90,14 +90,22 @@ ZUNO treats short video viewing with respect: rather than gamifying your watch t
 
 - **Shorts Discovery Grid:** A 3-column discovery feed with dynamic thumbnail generation, duration badges, and HD resolution tags.
 - **Randomized Shuffle Feed:** Session-stable Fisher-Yates shuffle engine ensuring fresh discovery without immediate repeats.
-- **Gesture-Driven Playback:** Vertical swipe to change videos, single tap to play/pause, double tap to like, left vertical slide for brightness, right vertical slide for volume, and horizontal drag to seek.
+- **Gesture-Driven Playback & Double-Tap Heart:** Vertical swipe to change videos, single tap to play/pause, double tap to like with animated heart pop, left vertical slide for brightness, right vertical slide for volume, and horizontal drag to seek.
+- **6 Expressive Emoji Reactions & Clean Overlay:** Long-press reaction button to reveal floating emoji bar (`❤️`, `👍`, `😂`, `😮`, `😢`, `🔥`). Automatically hides Notes, Save, and Share controls while active to prevent visual clutter, with full-screen outside-tap and back gesture dismissal.
 - **Clean Viewing Mode:** One-tap distraction-free view hiding all HUD overlays, buttons, and navigation bars.
-- **Offline Interactions:** Like, bookmark, and write private notes for any local video; reviewed easily in the Interactions tab.
-- **Health-Conscious Viewing Reminders:** Configurable reminders (15m, 30m, 45m, 60m) that send a gentle, non-judgmental local Android notification when accumulated daily watch time reaches the threshold.
+- **Offline Interactions & Instagram-Inspired Collections:** Like, bookmark, and write private notes for any local video; manage collections via a refined 2-column square grid, dedicated drilldown view, and an Instagram-inspired bottom sheet for instant multi-collection toggling.
+- **About ZUNO & Technical Specifications:** Dedicated screen inside Settings detailing app version (1.0, Build 1), creator profile, 9 core architectural features, 100% offline privacy commitments, open-source acknowledgements, and expandable technical build parameters.
+- **Unified Theme-Aware Empty States (`EmptyStateView`):** Polished, branded empty state surfaces with tinted circular icons, clear guidance, and contextual call-to-actions across all tabs.
+- **Detailed Video Metadata Sheet:** Replaced cluttered card metadata with clean video titles and an exhaustive `VideoDetailsBottomSheet` detailing resolution, dimensions, duration, folder, size, path, and date added.
+- **Health-Conscious Viewing Reminders:** Fully customizable reminder durations (arbitrary hours and minutes via direct numeric typing or synchronized steppers, plus quick presets `15m, 18m, 30m, 45m, 1h, 1h 20m, 2h`) that deliver an audible, heads-up local Android notification (`zuno_viewing_reminders_v2`) with vibration when accumulated daily watch time reaches the threshold.
+- **Fluid Screen Rotation & Orientation Handling:** Seamlessly supports rotating between portrait and landscape during video playback without restarting the activity, reloading the video, or resetting the active feed.
 - **Activity Analytics:** 7-day watch activity breakdown, session counts, lifetime stats, and most-rewatched ranking.
 - **Physical Folders & Virtual Collections:** Manage physical device storage directories or curate virtual multi-folder playlists.
 - **Multi-Select Batch Actions:** Batch like, batch add to collection, batch share via native sharesheet, or batch delete with Android system confirmation.
-- **Six Design Themes:** Featuring signature brand **ZUNO** theme plus Ocean Pop, Sunset Glow, Fresh Mint, Lavender Dream, and Midnight Dark.
+- **Double-Tap Animated Heart & Emoji Reactions:** Double-tap anywhere during video playback to trigger an animated heart pop at the exact tap coordinate and register a Like reaction; long-press the social rail to select from 6 expressive emoji reactions (❤️ Love, 👍 Like, 😂 Haha, 😮 Wow, 😢 Sad, 🔥 Fire).
+- **Dedicated Daily Screen-Time Experience:** Interactive 7-day activity chart with active day highlights, full day-by-day navigation (`<` / `>`), jump-to-Today, hero screen time, 3-metric breakdown, top video of the day, and a chronological session timeline.
+- **Directional Horizontal Tab Swiping:** Swipe horizontally anywhere between the five bottom tabs (Shorts ↔ Liked ↔ Activity ↔ Library ↔ Settings) with smooth slide animations, aspect-ratio gesture protection preventing interference with vertical Shorts playback, and state preservation via `SaveableStateProvider`.
+- **Five Curated Design Themes:** Featuring signature brand **ZUNO** theme plus Sunset Glow, Fresh Mint, Lavender Dream, and Midnight Dark, laid out in an ergonomic single row in Settings.
 
 ---
 
@@ -244,17 +252,17 @@ ZUNO strictly enforces **playback queue isolation** via `FeedQueueManager`. When
 - **`GlobalRandomFeed`:** Plays from the entire local video library in a randomized shuffle order.
 - **`FolderSequential`:** Confined strictly to videos within that physical storage folder. Swiping next or previous cannot escape into unrelated videos.
 - **`CollectionSequential`:** Confined strictly to videos tagged within that virtual collection.
-
-For sequence diagrams and queue management details, see [docs/PLAYBACK.md](docs/PLAYBACK.md).
+- **`InteractionSequential`:** Dedicated isolated sequential queue for Liked Videos, Saved Videos, and Video Notes. Starts at the exact selected item with no numeric position badges to maintain a clean social UI.
 
 ---
 
-## 12. Media3 & ExoPlayer Lifecycle
+## 12. Media3, ExoPlayer Lifecycle & Screen Rotation
 
 - **Single Active ExoPlayer:** Maintains exactly one hardware-accelerated playback instance to conserve memory.
+- **Uninterrupted Rotation:** Declares `orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden` in `AndroidManifest.xml`. Rotating between portrait and landscape preserves the playing video, current playback position, and active queue without activity destruction.
 - **Audio Focus:** Handles focus loss automatically (pausing during phone calls, resuming smoothly).
 - **Background Release:** Immediately ceases decoder activity on app backgrounding or screen off.
-- **Aspect Scaling:** Supports automatic switching between `FIT` and `ZOOM` aspect ratios.
+- **Aspect Scaling:** Automatically fits portrait and widescreen aspect ratios with clean letterboxing or pillarboxing.
 
 ---
 
@@ -299,11 +307,11 @@ For full database schema diagrams and SQL definitions, see [docs/DATABASE.md](do
 
 Replacing gamified goals and streaks, ZUNO features a mindful **Viewing Reminder**:
 
-- **Intervals:** 15 minutes, 30 minutes, 45 minutes, 60 minutes, or Disabled.
+- **Flexible Interval Configuration:** Select from quick presets (`15m, 18m, 30m, 45m, 1h, 1h 20m, 2h`) or manually enter arbitrary durations (e.g., 1 hour 36 minutes, 18 minutes, 2 hours 7 minutes) via synchronized numeric inputs and steppers.
 - **Eligible Watch Time:** `PlaybackWatchTimeTracker` counts only foreground active playback (excluding pause, buffering, background, or lock screen time).
-- **Gentle Notification:** When accumulated daily time reaches the threshold, ZUNO sends a calm Android notification:
-  - *Title:* `Take a little break`
-  - *Body:* `You've been watching for 30 minutes. Would you like to pause for a while?`
+- **Heads-Up Notification with Sound:** When accumulated daily time reaches the threshold, ZUNO delivers a high-priority heads-up notification on channel `zuno_viewing_reminders_v2` with the system default notification sound and double-pulse vibration:
+  - *Title:* `Time for a little break`
+  - *Body:* `You've been watching for 1 hour 36 minutes. Consider taking a short break.`
 - **Deduplication:** Notifies only once per threshold window per calendar day. Re-arms cleanly on date change.
 
 ---
@@ -311,8 +319,12 @@ Replacing gamified goals and streaks, ZUNO features a mindful **Viewing Reminder
 ## 18. Folder & Virtual Collection Management
 
 - **Physical Folders:** Mirrors real storage directories. Supports physical folder creation and folder renaming where Android storage permissions permit.
-- **Virtual Collections:** Curated lists created inside the app. A video can belong to multiple collections without copying or moving physical files.
-- **Collection Playback:** Dedicated player queue isolated to the selected collection.
+- **Instagram-Inspired Virtual Collections:**
+  - **Minimal Header & Dual Sub-Navigation:** Header displays `Saved` count with a `+` button to create new collections, alongside dual tabs for `All Saved` and `Collections`.
+  - **2-Column Square Grid:** Displays 1:1 aspect ratio square collection cards with dynamic cover thumbnails from the latest added video, collection title, video count, and a 3-dots management menu (Rename, Delete). Empty collections display the subtle ZUNO master brand symbol.
+  - **Dedicated Collection Drilldown:** Tap into any collection to view a dedicated 2-column video grid with simplified cards (resolution badge, duration pill, and title without distracting play buttons or folder names).
+  - **Instagram-Inspired Save Bottom Sheet:** Save any video to one or multiple collections instantly via checkmark toggles, or create a new collection inline with automatic assignment.
+  - **Collection Playback:** Swiping inside a collection is 100% isolated to that collection (`CollectionSequential`) without counter badges.
 
 ---
 
@@ -363,7 +375,7 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`
 ```powershell
 .\gradlew.bat test
 ```
-Result: **102 / 102 tests passing (100% pass rate)**. See [docs/TESTING.md](docs/TESTING.md) for details.
+Result: **114 / 114 tests passing (100% pass rate)**. See [docs/TESTING.md](docs/TESTING.md) for details.
 
 ---
 
@@ -380,14 +392,15 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 A pre-built standalone APK is available at:
 `D:\Projects\ZUNO-Release\ZUNO-debug.apk`
 
-- **File Size:** 25,258,049 bytes (24.08 MB)
-- **SHA-256:** `468DF141D8D3CB706BD44176FAF93F89B2D3523B3E2AF79EB7FC8CCAED45591A`
+- **File Size:** 25,657,623 bytes (24.47 MB)
+- **SHA-256:** `28FE934DC18BEAE3EF3A66167ED5A3790C56958C97C07E72CD867B0CA5F00081`
 
 ---
 
-## 24. Troubleshooting & Limitations
+## 24. Troubleshooting & 4K Playback Limitations
 
-- **Hardware Codec Constraints:** Playback capability depends on device hardware decoders (e.g., 4K 60fps/10-bit playback requires supported device hardware).
+- **4K UHD Hardware Decoding:** Landscape 4K videos (e.g., 3840×2160 up to 60fps in WebM VP9, MP4 AVC/HEVC) decode smoothly in hardware via MediaTek decoders (`c2.mtk.*`).
+- **Portrait 4K Hardware Boundary:** Extreme portrait 4K recordings (e.g. 2160×3840) exceed the chipset's physical hardware limit of 2176 vertical lines on this device. ZUNO displays a graceful, informative error card rather than failing silently or causing native driver crashes.
 - **Storage Permission Required:** Videos will not populate until storage access is granted in Android system settings.
 - **Android Scoped Storage Restrictions:** File renaming and deletion on external SD cards require Android system SAF consent prompts.
 
@@ -397,7 +410,7 @@ A pre-built standalone APK is available at:
 
 Contributions are welcome! Please follow these standards:
 1. Ensure all code conforms to Kotlin coding conventions.
-2. Run `.\gradlew.bat test` to confirm all 102 tests pass without regression.
+2. Run `.\gradlew.bat test` to confirm all 121 tests pass without regression.
 3. Preserve the offline-first, zero-tracking philosophy.
 
 ---

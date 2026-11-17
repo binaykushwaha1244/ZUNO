@@ -193,6 +193,16 @@ class InMemoryDailyWatchRecordDao : DailyWatchRecordDao {
         }
     }
 
+    override fun observeRecordsForDate(dateString: String): Flow<List<DailyWatchRecordEntity>> {
+        return store.map { list ->
+            list.filter { it.dateString == dateString }.sortedByDescending { it.lastWatchedAt }
+        }
+    }
+
+    override suspend fun getRecordsForDateSync(dateString: String): List<DailyWatchRecordEntity> {
+        return store.value.filter { it.dateString == dateString }.sortedByDescending { it.lastWatchedAt }
+    }
+
     override suspend fun deleteForVideo(mediaStoreId: Long): Int {
         val initialSize = store.value.size
         store.update { it.filterNot { r -> r.mediaStoreId == mediaStoreId } }

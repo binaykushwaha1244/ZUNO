@@ -1,10 +1,16 @@
 package com.binay.vscroll.ui.library
 
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -16,12 +22,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,6 +46,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
+import com.binay.vscroll.R
+import com.binay.vscroll.ui.components.VideoThumbnailView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -210,13 +223,20 @@ fun AddToCollectionSheet(
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CollectionsBookmark,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "No Collections Yet",
                             style = MaterialTheme.typography.titleMedium,
@@ -234,14 +254,14 @@ fun AddToCollectionSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 300.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(collections, key = { it.id }) { collection ->
                         val isChecked = selectedCollectionIds.contains(collection.id)
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isChecked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            else MaterialTheme.colorScheme.surface,
+                            color = if (isChecked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
@@ -258,14 +278,49 @@ fun AddToCollectionSheet(
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = { checked ->
-                                        if (checked) selectedCollectionIds.add(collection.id)
-                                        else selectedCollectionIds.remove(collection.id)
+                                // 1:1 Square Thumbnail
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(
+                                            0.5.dp,
+                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    if (collection.coverVideoId != null && collection.coverVideoUri != null) {
+                                        VideoThumbnailView(
+                                            videoId = collection.coverVideoId,
+                                            uri = Uri.parse(collection.coverVideoUri),
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.linearGradient(
+                                                        listOf(
+                                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                                            MaterialTheme.colorScheme.surfaceVariant
+                                                        )
+                                                    )
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(26.dp)
+                                            )
+                                        }
                                     }
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = collection.name,
@@ -280,6 +335,13 @@ fun AddToCollectionSheet(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+
+                                Icon(
+                                    imageVector = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = if (isChecked) "Selected" else "Not selected",
+                                    tint = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
                         }
                     }

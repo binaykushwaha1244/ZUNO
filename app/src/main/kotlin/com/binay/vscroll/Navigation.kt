@@ -1,8 +1,17 @@
 package com.binay.vscroll
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,9 +37,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +54,7 @@ import com.binay.vscroll.data.preferences.ThemePreferencesRepository
 import com.binay.vscroll.data.repository.FeedQueueManager
 import com.binay.vscroll.data.repository.MediaStoreVideoRepository
 import com.binay.vscroll.data.repository.VideoInteractionRepositoryImpl
+import com.binay.vscroll.domain.model.InteractionSource
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.ui.activity.ActivityScreen
 import com.binay.vscroll.ui.home.HomeViewModel
@@ -50,6 +63,7 @@ import com.binay.vscroll.ui.liked.LikedScreen
 import com.binay.vscroll.ui.liked.LikedViewModel
 import com.binay.vscroll.ui.navigation.NavDestination
 import com.binay.vscroll.ui.player.FolderPlaybackScreen
+import com.binay.vscroll.ui.player.InteractionPlaybackScreen
 import com.binay.vscroll.ui.player.PlayerViewModel
 import com.binay.vscroll.ui.player.SystemUiImmersiveMode
 import com.binay.vscroll.ui.saved.SavedVideosScreen
@@ -89,42 +103,84 @@ fun MainNavigation(
 
     var isSavedVideosOpen by rememberSaveable { mutableStateOf(false) }
 
-    val onPlayVideoFromInteraction: (VideoItem) -> Unit = { video ->
+    val onPlayInteraction: (InteractionSource, List<VideoItem>, Int) -> Unit = { source, videos, initialIndex ->
         isSavedVideosOpen = false
-        val currentQueue = feedQueueManager.shortsQueue.value.items
-        val idx = currentQueue.indexOfFirst { it.id == video.id }
-        if (idx >= 0) {
-            feedQueueManager.updateShortsIndex(idx)
-        }
-        selectedDestination = NavDestination.SHORTS
-        isShortsPlayerOpen = true
+        feedQueueManager.startInteractionPlayback(source, videos, initialIndex)
+    }
+
+    val onPlaySingleVideo: (VideoItem) -> Unit = { video ->
+        isSavedVideosOpen = false
+        feedQueueManager.startInteractionPlayback(InteractionSource.SAVED, listOf(video), 0)
     }
 
     val folderQueueState by feedQueueManager.folderQueue.collectAsStateWithLifecycle()
+    val interactionQueueState by feedQueueManager.interactionQueue.collectAsStateWithLifecycle()
 
     // Synchronize persistent shuffle preference with FeedQueueManager
     LaunchedEffect(isShuffleEnabled) {
         feedQueueManager.setShuffleEnabled(isShuffleEnabled)
     }
 
-    // Determine whether immersive full-screen playback is active (Shorts player or Folder player)
-    val isImmersive = isShortsPlayerOpen || (folderQueueState != null)
+    val destinations = NavDestination.entries
+    val saveableStateHolder = rememberSaveableStateHolder()
+
+    val navigateToDestination: (NavDestination) -> Unit = { destination ->
+        if (selectedDestination != destination) {
+            isShortsPlayerOpen = false
+            isSavedVideosOpen = false
+            playerViewModel.pause()
+            selectedDestination = destination
+        }
+    }
+
+    val onSwipeNextTab: () -> Unit = {
+        val currentIdx = selectedDestination.ordinal
+        if (currentIdx < destinations.size - 1) {
+            navigateToDestination(destinations[currentIdx + 1])
+        }
+    }
+
+    val onSwipePrevTab: () -> Unit = {
+        val currentIdx = selectedDestination.ordinal
+        if (currentIdx > 0) {
+            navigateToDestination(destinations[currentIdx - 1])
+        }
+    }
+
+    // Determine whether immersive full-screen playback is active (Shorts player, Folder player, or Interaction player)
+    val isImmersive = isShortsPlayerOpen || (folderQueueState != null) || (interactionQueueState != null)
 
     // Apply Sticky Immersive Mode: hides Android status & navigation bars for true edge-to-edge playback
     SystemUiImmersiveMode(enabled = isImmersive)
 
-    // Pause playback whenever navigating away from Shorts (unless folder playback is actively showing)
-    LaunchedEffect(selectedDestination, folderQueueState, isShortsPlayerOpen) {
-        if (folderQueueState == null && (!isShortsPlayerOpen || selectedDestination != NavDestination.SHORTS)) {
+    // Pause playback whenever navigating away from Shorts (unless folder or interaction playback is actively showing)
+    LaunchedEffect(selectedDestination, folderQueueState, interactionQueueState, isShortsPlayerOpen) {
+        if (folderQueueState == null && interactionQueueState == null && (!isShortsPlayerOpen || selectedDestination != NavDestination.SHORTS)) {
             playerViewModel.pause()
         }
     }
 
-    // Full-screen Mode B: Folder-Specific Sequential Playback
-    if (folderQueueState != null) {
+    // Full-screen Mode C: Interaction Sequential Playback (Liked, Saved, Notes)
+    if (interactionQueueState != null) {
+        InteractionPlaybackScreen(
+            feedQueueState = interactionQueueState!!,
+            playerViewModel = playerViewModel,
+            interactionRepository = videoInteractionRepository,
+            collectionRepository = homeViewModel.collectionRepository,
+            onIndexChanged = { index ->
+                feedQueueManager.updateInteractionIndex(index)
+            },
+            onClose = {
+                feedQueueManager.closeInteractionPlayback()
+                playerViewModel.pause()
+            }
+        )
+    } else if (folderQueueState != null) {
         FolderPlaybackScreen(
             feedQueueState = folderQueueState!!,
             playerViewModel = playerViewModel,
+            interactionRepository = videoInteractionRepository,
+            collectionRepository = homeViewModel.collectionRepository,
             onIndexChanged = { index ->
                 feedQueueManager.updateFolderIndex(index)
             },
@@ -164,21 +220,20 @@ fun MainNavigation(
         }
 
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .horizontalTabSwipe(
+                    enabled = !isImmersive && !uiState.isMultiSelectActive && !isSavedVideosOpen,
+                    onSwipeNext = onSwipeNextTab,
+                    onSwipePrev = onSwipePrevTab
+                ),
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
                 // Completely omit the bottom bar when immersive player is open
                 if (!isImmersive) {
                     VScrollBottomNavigationBar(
                         selectedDestination = selectedDestination,
-                        onDestinationSelected = { destination ->
-                            if (selectedDestination != destination) {
-                                isShortsPlayerOpen = false
-                                isSavedVideosOpen = false
-                                playerViewModel.pause()
-                                selectedDestination = destination
-                            }
-                        }
+                        onDestinationSelected = navigateToDestination
                     )
                 }
             }
@@ -189,75 +244,98 @@ fun MainNavigation(
                     // When player is open, omit innerPadding for true full-screen edge-to-edge playback
                     .then(if (isImmersive) Modifier else Modifier.padding(innerPadding))
             ) {
-                when (selectedDestination) {
-                    NavDestination.SHORTS -> {
-                        if (isSavedVideosOpen) {
-                            SavedVideosScreen(
-                                viewModel = likedViewModel,
-                                onBack = { isSavedVideosOpen = false },
-                                onPlayVideo = onPlayVideoFromInteraction
-                            )
+                AnimatedContent(
+                    targetState = selectedDestination,
+                    transitionSpec = {
+                        val targetIdx = targetState.ordinal
+                        val initialIdx = initialState.ordinal
+                        if (targetIdx > initialIdx) {
+                            (slideInHorizontally(animationSpec = tween(280)) { width -> width } + fadeIn(animationSpec = tween(280)))
+                                .togetherWith(slideOutHorizontally(animationSpec = tween(280)) { width -> -width } + fadeOut(animationSpec = tween(280)))
                         } else {
-                            ShortsScreen(
-                                feedQueueManager = feedQueueManager,
-                                interactionRepository = videoInteractionRepository,
-                                isFeedActive = (selectedDestination == NavDestination.SHORTS),
-                                playerViewModel = playerViewModel,
-                                isPlayerOpen = isShortsPlayerOpen,
-                                onPlayerOpenChanged = { isShortsPlayerOpen = it },
-                                isShuffleEnabled = isShuffleEnabled,
-                                onToggleShuffle = {
-                                    scope.launch {
-                                        themePreferencesRepo.setShuffleEnabled(!isShuffleEnabled)
-                                    }
-                                },
-                                onNavigateToLibrary = { selectedDestination = NavDestination.LIBRARY },
-                                onNavigateToSaved = { isSavedVideosOpen = true }
-                            )
+                            (slideInHorizontally(animationSpec = tween(280)) { width -> -width } + fadeIn(animationSpec = tween(280)))
+                                .togetherWith(slideOutHorizontally(animationSpec = tween(280)) { width -> width } + fadeOut(animationSpec = tween(280)))
                         }
-                    }
-                    NavDestination.LIKED -> {
-                        LikedScreen(
-                            viewModel = likedViewModel,
-                            onPlayVideo = onPlayVideoFromInteraction
-                        )
-                    }
-                    NavDestination.ACTIVITY -> {
-                        ActivityScreen(
-                            onPlayVideo = onPlayVideoFromInteraction
-                        )
-                    }
-                    NavDestination.LIBRARY -> {
-                        LibraryScreen(
-                            viewModel = homeViewModel,
-                            onVideoClick = { _, index, displayedVideos, selectedFolder, selectedCollection ->
-                                when {
-                                    selectedCollection != null -> {
-                                        feedQueueManager.startCollectionPlayback(
-                                            collectionId = selectedCollection.id,
-                                            collectionName = selectedCollection.name,
-                                            collectionVideos = displayedVideos,
-                                            initialIndex = index,
-                                            sortOrder = uiState.sortOrder
-                                        )
-                                    }
-                                    else -> {
-                                        val folderId = selectedFolder?.relativePath ?: "all_videos"
-                                        val folderName = selectedFolder?.name ?: "All Videos"
-                                        feedQueueManager.startFolderPlayback(
-                                            folderId = folderId,
-                                            folderName = folderName,
-                                            folderVideos = displayedVideos,
-                                            initialIndex = index,
-                                            sortOrder = uiState.sortOrder
-                                        )
-                                    }
+                    },
+                    label = "TabContentAnimation"
+                ) { destination ->
+                    saveableStateHolder.SaveableStateProvider(key = destination.name) {
+                        when (destination) {
+                            NavDestination.SHORTS -> {
+                                if (isSavedVideosOpen) {
+                                    SavedVideosScreen(
+                                        viewModel = likedViewModel,
+                                        collectionRepository = homeViewModel.collectionRepository,
+                                        feedQueueManager = feedQueueManager,
+                                        onBack = { isSavedVideosOpen = false },
+                                        onPlayInteraction = onPlayInteraction
+                                    )
+                                } else {
+                                    ShortsScreen(
+                                        feedQueueManager = feedQueueManager,
+                                        interactionRepository = videoInteractionRepository,
+                                        collectionRepository = homeViewModel.collectionRepository,
+                                        isFeedActive = (selectedDestination == NavDestination.SHORTS),
+                                        playerViewModel = playerViewModel,
+                                        isPlayerOpen = isShortsPlayerOpen,
+                                        onPlayerOpenChanged = { isShortsPlayerOpen = it },
+                                        isShuffleEnabled = isShuffleEnabled,
+                                        onToggleShuffle = {
+                                            scope.launch {
+                                                themePreferencesRepo.setShuffleEnabled(!isShuffleEnabled)
+                                            }
+                                        },
+                                        onNavigateToLibrary = { navigateToDestination(NavDestination.LIBRARY) },
+                                        onNavigateToSaved = { isSavedVideosOpen = true }
+                                    )
                                 }
                             }
-                        )
-                    }
-                    NavDestination.SETTINGS -> {
-                        SettingsScreen(viewModel = homeViewModel)
+                            NavDestination.LIKED -> {
+                                LikedScreen(
+                                    viewModel = likedViewModel,
+                                    collectionRepository = homeViewModel.collectionRepository,
+                                    feedQueueManager = feedQueueManager,
+                                    onPlayInteraction = onPlayInteraction
+                                )
+                            }
+                            NavDestination.ACTIVITY -> {
+                                ActivityScreen(
+                                    onPlayVideo = onPlaySingleVideo
+                                )
+                            }
+                            NavDestination.LIBRARY -> {
+                                LibraryScreen(
+                                    viewModel = homeViewModel,
+                                    onVideoClick = { _, index, displayedVideos, selectedFolder, selectedCollection ->
+                                        when {
+                                            selectedCollection != null -> {
+                                                feedQueueManager.startCollectionPlayback(
+                                                    collectionId = selectedCollection.id,
+                                                    collectionName = selectedCollection.name,
+                                                    collectionVideos = displayedVideos,
+                                                    initialIndex = index,
+                                                    sortOrder = uiState.sortOrder
+                                                )
+                                            }
+                                            else -> {
+                                                val folderId = selectedFolder?.relativePath ?: "all_videos"
+                                                val folderName = selectedFolder?.name ?: "All Videos"
+                                                feedQueueManager.startFolderPlayback(
+                                                    folderId = folderId,
+                                                    folderName = folderName,
+                                                    folderVideos = displayedVideos,
+                                                    initialIndex = index,
+                                                    sortOrder = uiState.sortOrder
+                                                )
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            NavDestination.SETTINGS -> {
+                                SettingsScreen(viewModel = homeViewModel)
+                            }
+                        }
                     }
                 }
             }
@@ -333,6 +411,69 @@ private fun VScrollBottomNavigationBar(
                         color = contentColor
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Directional horizontal swipe gesture detector for seamless tab switching.
+ * Strictly avoids gesture conflicts with vertical video playback in Shorts:
+ * - Requires horizontal delta to exceed vertical delta by 1.5x (aspect ratio check).
+ * - Requires drag to exceed touchSlop before locking to horizontal direction.
+ * - If vertical motion starts first, locks to vertical and never triggers tab navigation.
+ */
+fun Modifier.horizontalTabSwipe(
+    enabled: Boolean = true,
+    onSwipeNext: () -> Unit,
+    onSwipePrev: () -> Unit
+): Modifier = pointerInput(enabled) {
+    if (!enabled) return@pointerInput
+    val touchSlop = viewConfiguration.touchSlop
+    val swipeThreshold = 70.dp.toPx()
+
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var totalX = 0f
+        var totalY = 0f
+        var isLockedHorizontal = false
+        var isLockedVertical = false
+
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Main)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) {
+                // Finger released
+                if (isLockedHorizontal && kotlin.math.abs(totalX) >= swipeThreshold) {
+                    if (totalX < 0) {
+                        onSwipeNext()
+                    } else {
+                        onSwipePrev()
+                    }
+                }
+                break
+            }
+
+            val dragX = change.position.x - change.previousPosition.x
+            val dragY = change.position.y - change.previousPosition.y
+            totalX += dragX
+            totalY += dragY
+
+            val absX = kotlin.math.abs(totalX)
+            val absY = kotlin.math.abs(totalY)
+
+            if (!isLockedHorizontal && !isLockedVertical) {
+                if (absY > touchSlop && absY > absX) {
+                    // Vertical drag initiated - lock to vertical, DO NOT intercept
+                    isLockedVertical = true
+                } else if (absX > touchSlop && absX > absY * 1.5f) {
+                    // Clearly horizontal drag initiated
+                    isLockedHorizontal = true
+                }
+            }
+
+            if (isLockedHorizontal) {
+                change.consume()
             }
         }
     }

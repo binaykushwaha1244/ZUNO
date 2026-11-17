@@ -69,16 +69,15 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun themeModes_allSixThemesExist() {
+    fun themeModes_allFiveThemesExist() {
         val themes = VScrollThemeMode.entries
-        assertEquals(6, themes.size)
+        assertEquals(5, themes.size)
 
         assertEquals(VScrollThemeMode.ZUNO, themes[0])
-        assertEquals(VScrollThemeMode.OCEAN_POP, themes[1])
-        assertEquals(VScrollThemeMode.SUNSET_GLOW, themes[2])
-        assertEquals(VScrollThemeMode.FRESH_MINT, themes[3])
-        assertEquals(VScrollThemeMode.LAVENDER_DREAM, themes[4])
-        assertEquals(VScrollThemeMode.MIDNIGHT, themes[5])
+        assertEquals(VScrollThemeMode.SUNSET_GLOW, themes[1])
+        assertEquals(VScrollThemeMode.FRESH_MINT, themes[2])
+        assertEquals(VScrollThemeMode.LAVENDER_DREAM, themes[3])
+        assertEquals(VScrollThemeMode.MIDNIGHT, themes[4])
 
         themes.forEach { mode ->
             assertNotNull(mode.displayName)

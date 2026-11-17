@@ -6,6 +6,8 @@ import com.binay.vscroll.data.local.entity.DailyWatchRecordEntity
 import com.binay.vscroll.data.local.entity.WatchHistoryEntity
 import com.binay.vscroll.domain.model.ActivityDashboardData
 import com.binay.vscroll.domain.model.DailyActivityBar
+import com.binay.vscroll.domain.model.DailyScreenTimeDetails
+import com.binay.vscroll.domain.model.DailyWatchSessionItem
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.domain.model.WatchHistoryItem
 import com.binay.vscroll.domain.repository.VideoRepository
@@ -18,6 +20,7 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -240,6 +243,102 @@ class WatchHistoryRepositoryImpl(
                 mostWatchedVideos = mostWatchedItems,
                 recentHistory = allHistory
             )
+        }
+    }
+
+    override fun observeDailyScreenTime(dateString: String): Flow<DailyScreenTimeDetails> {
+        return combine(
+            dailyWatchRecordDao.observeRecordsForDate(dateString),
+            watchHistoryDao.observeAllWatchHistory(),
+            videoRepository.getVideos()
+        ) { records, allHistory, videos ->
+            val historyMap = allHistory.associateBy { it.mediaStoreId }
+            val videoMap = videos.associateBy { it.id }
+            val zone = zoneId
+            val parsedDate = try {
+                LocalDate.parse(dateString)
+            } catch (e: Exception) {
+                LocalDate.now()
+            }
+            val fullDateFormatter = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.getDefault())
+            val formattedFullDate = parsedDate.format(fullDateFormatter)
+
+            val totalTimeMs = records.sumOf { it.watchTimeMs }
+            val videoCount = records.size
+            val totalSessions = records.sumOf { it.sessionCount }
+            val avgTimeMs = if (videoCount > 0) totalTimeMs / videoCount else 0L
+
+            val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+
+            val sessionItems = records.map { record ->
+                val history = historyMap[record.mediaStoreId]
+                val video = videoMap[record.mediaStoreId]
+                val title = video?.title ?: history?.cachedTitle ?: "Video #${record.mediaStoreId}"
+                val folder = video?.folderName ?: history?.cachedFolderName ?: "Videos"
+                val lastWatchedDateTime = Instant.ofEpochMilli(record.lastWatchedAt).atZone(zone)
+                val formattedTime = lastWatchedDateTime.format(timeFormatter)
+                val startWallTime = maxOf(0L, record.lastWatchedAt - record.watchTimeMs)
+                val startDateTime = Instant.ofEpochMilli(startWallTime).atZone(zone)
+                val sessionSpan = "${startDateTime.format(timeFormatter)} – $formattedTime"
+
+                DailyWatchSessionItem(
+                    mediaStoreId = record.mediaStoreId,
+                    title = title,
+                    folderName = folder,
+                    watchTimeMs = record.watchTimeMs,
+                    sessionCount = record.sessionCount,
+                    lastWatchedAt = record.lastWatchedAt,
+                    formattedTime = sessionSpan,
+                    formattedDuration = formatDurationTimeSpan(record.watchTimeMs)
+                )
+            }
+
+            val mostWatchedRecord = records.maxByOrNull { it.watchTimeMs }
+            val mostWatchedHistory = mostWatchedRecord?.let { historyMap[it.mediaStoreId] }
+            val mostWatchedVideo = mostWatchedRecord?.let { videoMap[it.mediaStoreId] }
+            val mostWatchedItem = mostWatchedRecord?.let { r ->
+                WatchHistoryItem(
+                    mediaStoreId = r.mediaStoreId,
+                    cachedTitle = mostWatchedHistory?.cachedTitle ?: mostWatchedVideo?.title ?: "Video #${r.mediaStoreId}",
+                    cachedFolderName = mostWatchedHistory?.cachedFolderName ?: mostWatchedVideo?.folderName ?: "Videos",
+                    contentUri = mostWatchedHistory?.contentUri ?: mostWatchedVideo?.uriString ?: "",
+                    cachedDurationMs = mostWatchedHistory?.cachedDurationMs ?: mostWatchedVideo?.durationMillis ?: 0L,
+                    firstWatchedAt = mostWatchedHistory?.firstWatchedAt ?: r.lastWatchedAt,
+                    lastWatchedAt = r.lastWatchedAt,
+                    totalWatchTimeMs = r.watchTimeMs,
+                    sessionCount = r.sessionCount,
+                    lastPositionMs = mostWatchedHistory?.lastPositionMs ?: 0L,
+                    videoItem = mostWatchedVideo
+                )
+            }
+
+            DailyScreenTimeDetails(
+                dateString = dateString,
+                formattedFullDate = formattedFullDate,
+                totalWatchTimeMs = totalTimeMs,
+                formattedTotalWatchTime = formatDurationTimeSpan(totalTimeMs),
+                totalVideosWatched = videoCount,
+                averageWatchTimePerVideoMs = avgTimeMs,
+                formattedAverageWatchTime = formatDurationTimeSpan(avgTimeMs),
+                totalSessions = totalSessions,
+                mostWatchedVideo = mostWatchedItem,
+                sessions = sessionItems
+            )
+        }
+    }
+
+    private fun formatDurationTimeSpan(ms: Long): String {
+        val totalSec = ms / 1000
+        val sec = totalSec % 60
+        val min = (totalSec / 60) % 60
+        val hr = totalSec / 3600
+        return when {
+            hr > 0 && min > 0 -> "${hr}h ${min}m"
+            hr > 0 -> "${hr}h"
+            min > 0 && sec > 0 -> "${min}m ${sec}s"
+            min > 0 -> "${min}m"
+            sec > 0 -> "${sec}s"
+            else -> "0m"
         }
     }
 

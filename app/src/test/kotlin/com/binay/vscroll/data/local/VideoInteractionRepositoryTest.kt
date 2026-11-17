@@ -51,7 +51,7 @@ class InMemoryVideoInteractionDao : VideoInteractionDao {
 
     override fun getAllLikedVideos(): Flow<List<VideoInteractionEntity>> {
         return store.map { map ->
-            map.values.filter { it.isLiked }.sortedByDescending { it.likedAt ?: 0L }
+            map.values.filter { it.isLiked || it.reactionType != null }.sortedByDescending { it.likedAt ?: 0L }
         }
     }
 
@@ -64,6 +64,12 @@ class InMemoryVideoInteractionDao : VideoInteractionDao {
     override suspend fun updateLikeStatus(mediaStoreId: Long, isLiked: Boolean, likedAt: Long?, updatedAt: Long): Int {
         val existing = store.value[mediaStoreId] ?: return 0
         store.update { it + (mediaStoreId to existing.copy(isLiked = isLiked, likedAt = likedAt, updatedAt = updatedAt)) }
+        return 1
+    }
+
+    override suspend fun updateReactionStatus(mediaStoreId: Long, isLiked: Boolean, reactionType: String?, likedAt: Long?, updatedAt: Long): Int {
+        val existing = store.value[mediaStoreId] ?: return 0
+        store.update { it + (mediaStoreId to existing.copy(isLiked = isLiked, reactionType = reactionType, likedAt = likedAt, updatedAt = updatedAt)) }
         return 1
     }
 
@@ -80,7 +86,7 @@ class InMemoryVideoInteractionDao : VideoInteractionDao {
     }
 
     override fun getLikedCount(): Flow<Int> {
-        return store.map { map -> map.values.count { it.isLiked } }
+        return store.map { map -> map.values.count { it.isLiked || it.reactionType != null } }
     }
 
     override fun getBookmarkedCount(): Flow<Int> {

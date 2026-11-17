@@ -52,3 +52,27 @@ data class ActivityDashboardData(
     }
 }
 
+data class DailyWatchSessionItem(
+    val mediaStoreId: Long,
+    val title: String,
+    val folderName: String,
+    val watchTimeMs: Long,
+    val sessionCount: Int,
+    val lastWatchedAt: Long,
+    val formattedTime: String,
+    val formattedDuration: String
+)
+
+data class DailyScreenTimeDetails(
+    val dateString: String,
+    val formattedFullDate: String,
+    val totalWatchTimeMs: Long = 0L,
+    val formattedTotalWatchTime: String = "0m",
+    val totalVideosWatched: Int = 0,
+    val averageWatchTimePerVideoMs: Long = 0L,
+    val formattedAverageWatchTime: String = "0m",
+    val totalSessions: Int = 0,
+    val mostWatchedVideo: WatchHistoryItem? = null,
+    val sessions: List<DailyWatchSessionItem> = emptyList()
+)
+

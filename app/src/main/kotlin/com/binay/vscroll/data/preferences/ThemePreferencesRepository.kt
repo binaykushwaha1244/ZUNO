@@ -25,22 +25,14 @@ class ThemePreferencesRepository(private val context: Context) {
         val isMigrated = preferences[themeMigratedKey] ?: false
 
         if (savedName != null) {
-            val parsed = try {
-                VScrollThemeMode.valueOf(savedName)
-            } catch (e: IllegalArgumentException) {
+            if (savedName == "OCEAN_POP") {
                 VScrollThemeMode.ZUNO
-            }
-
-            if (!isMigrated) {
-                // If existing install has the legacy default (OCEAN_POP), migrate to brand ZUNO theme.
-                // If the user had explicitly chosen another theme (Sunset, Mint, Lavender, Midnight), preserve it!
-                if (parsed == VScrollThemeMode.OCEAN_POP) {
-                    VScrollThemeMode.ZUNO
-                } else {
-                    parsed
-                }
             } else {
-                parsed
+                try {
+                    VScrollThemeMode.valueOf(savedName)
+                } catch (e: IllegalArgumentException) {
+                    VScrollThemeMode.ZUNO
+                }
             }
         } else {
             VScrollThemeMode.ZUNO // Default for new installations

@@ -44,25 +44,20 @@ class PlayerPlaybackStateTest {
     }
 
     @Test
-    fun settingsThemeGrid_chunksIntoTwoRowsOfThree() {
-        val rows = com.binay.vscroll.ui.theme.VScrollThemeMode.entries.chunked(3)
-        assertEquals(2, rows.size)
-        assertEquals(3, rows[0].size)
-        assertEquals(3, rows[1].size)
+    fun settingsThemeList_containsFiveThemes() {
+        val themes = com.binay.vscroll.ui.theme.VScrollThemeMode.entries
+        assertEquals(5, themes.size)
 
-        // Verify row 1 contents
-        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.ZUNO, rows[0][0])
-        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.OCEAN_POP, rows[0][1])
-        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.SUNSET_GLOW, rows[0][2])
-
-        // Verify row 2 contents
-        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.FRESH_MINT, rows[1][0])
-        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.LAVENDER_DREAM, rows[1][1])
-        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.MIDNIGHT, rows[1][2])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.ZUNO, themes[0])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.SUNSET_GLOW, themes[1])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.FRESH_MINT, themes[2])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.LAVENDER_DREAM, themes[3])
+        assertEquals(com.binay.vscroll.ui.theme.VScrollThemeMode.MIDNIGHT, themes[4])
 
         // Verify displayNames are non-blank
-        com.binay.vscroll.ui.theme.VScrollThemeMode.entries.forEach { mode ->
+        themes.forEach { mode ->
             assertTrue(mode.displayName.isNotBlank())
+            assertTrue(mode.subtitle.isNotBlank())
         }
     }
 

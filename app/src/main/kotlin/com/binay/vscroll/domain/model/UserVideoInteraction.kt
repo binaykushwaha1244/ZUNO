@@ -1,6 +1,25 @@
 package com.binay.vscroll.domain.model
 
 /**
+ * Supported expressive emoji reactions for local videos.
+ */
+enum class ReactionType(val emoji: String, val label: String) {
+    LOVE("❤️", "Love"),
+    LIKE("👍", "Like"),
+    HAHA("😂", "Haha"),
+    WOW("😮", "Wow"),
+    SAD("😢", "Sad"),
+    FIRE("🔥", "Fire");
+
+    companion object {
+        fun fromString(value: String?): ReactionType? {
+            if (value.isNullOrBlank()) return null
+            return entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
+        }
+    }
+}
+
+/**
  * Domain model representing user-facing interaction states for a local video.
  */
 data class UserVideoInteraction(
@@ -10,7 +29,8 @@ data class UserVideoInteraction(
     val isBookmarked: Boolean = false,
     val bookmarkedAt: Long? = null,
     val note: String? = null,
-    val noteUpdatedAt: Long? = null
+    val noteUpdatedAt: Long? = null,
+    val reaction: ReactionType? = null
 )
 
 /**
@@ -28,7 +48,8 @@ data class UserVideoItem(
     val likedAt: Long?,
     val isBookmarked: Boolean,
     val bookmarkedAt: Long?,
-    val videoItem: VideoItem?
+    val videoItem: VideoItem?,
+    val reaction: ReactionType? = null
 ) {
     val formattedDuration: String
         get() = videoItem?.formattedDuration ?: formatMillis(durationMillis)
