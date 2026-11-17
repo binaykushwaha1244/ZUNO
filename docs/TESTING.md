@@ -46,7 +46,7 @@ graph TD
 
 All releases are verified on a connected physical hardware device:
 
-- **Hardware:** OnePlus Nord CE5 (`REDACTED_DEVICE_SERIAL`)
+- **Hardware:** OnePlus Nord CE5 (Physical Hardware)
 - **OS:** Android 15 (API 35) / OxygenOS
 - **Test Matrix Executed:**
   1. **Settings Theme Selector 2-Row Grid:** Verified all 6 themes render in a responsive 2-row layout with zero character wrapping, crisp 46dp gradient swatches, and full label visibility.

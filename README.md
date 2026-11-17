@@ -187,7 +187,7 @@ For full architectural details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 ## 9. Project Folder Structure
 
 ```
-D:\Projects\VScroll/
+ZUNO/
 ├── app/
 │   ├── src/
 │   │   ├── main/
@@ -389,10 +389,10 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 > Always use the `-r` flag to perform an **in-place update**. Never uninstall the app prior to updating, as Android will delete the private SQLite database and DataStore preferences.
 
 ### Standalone Distributable APK
-A pre-built standalone APK is available at:
-`D:\Projects\ZUNO-Release\ZUNO-debug.apk`
+A standalone APK can be built locally or downloaded from the GitHub Releases section:
 
-- **File Size:** 25,657,623 bytes (24.47 MB)
+- **Build Output Path:** `app/build/outputs/apk/debug/app-debug.apk`
+- **File Size:** ~25.6 MB (25,657,623 bytes)
 - **SHA-256:** `28FE934DC18BEAE3EF3A66167ED5A3790C56958C97C07E72CD867B0CA5F00081`
 
 ---
