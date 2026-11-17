@@ -93,7 +93,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 To install ZUNO on any other physical Android device without a development environment:
 
-1. Copy the standalone APK from `D:\Projects\ZUNO-Release\ZUNO-debug.apk` to the target device (via USB cable, Local Send, or file manager).
+1. Copy the assembled APK (`app/build/outputs/apk/debug/app-debug.apk`) or GitHub Release asset to the target device (via USB cable, Local Send, or file manager).
    - **File Size:** 25,657,623 bytes (24.47 MB)
    - **SHA-256:** `28FE934DC18BEAE3EF3A66167ED5A3790C56958C97C07E72CD867B0CA5F00081`
 2. On the target device, tap the APK file in the Files application.
