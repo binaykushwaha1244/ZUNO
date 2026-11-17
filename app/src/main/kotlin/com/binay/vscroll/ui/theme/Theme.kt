@@ -139,7 +139,6 @@ fun VScrollTheme(
 ) {
     val targetScheme = when (themeMode) {
         VScrollThemeMode.ZUNO -> ZunoColorScheme
-        VScrollThemeMode.OCEAN_POP -> OceanPopColorScheme
         VScrollThemeMode.SUNSET_GLOW -> SunsetGlowColorScheme
         VScrollThemeMode.FRESH_MINT -> FreshMintColorScheme
         VScrollThemeMode.LAVENDER_DREAM -> LavenderDreamColorScheme

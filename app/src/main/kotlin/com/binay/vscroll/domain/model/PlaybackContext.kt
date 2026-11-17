@@ -21,6 +21,19 @@ sealed interface PlaybackContext {
         val initialVideoId: Long,
         val initialIndex: Int = 0
     ) : PlaybackContext
+
+    data class InteractionSequential(
+        val source: InteractionSource,
+        val initialVideoId: Long,
+        val initialIndex: Int = 0,
+        val queueId: String = "interaction_${source.name}_${System.currentTimeMillis()}"
+    ) : PlaybackContext
+}
+
+enum class InteractionSource(val displayName: String) {
+    LIKED("Liked Videos"),
+    SAVED("Saved Videos"),
+    NOTES("Video Notes")
 }
 
 enum class FeedOrderPreference(val displayName: String) {

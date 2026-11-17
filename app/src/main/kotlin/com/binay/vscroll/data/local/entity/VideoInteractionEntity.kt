@@ -11,7 +11,8 @@ import androidx.room.PrimaryKey
         Index(value = ["is_liked"]),
         Index(value = ["is_bookmarked"]),
         Index(value = ["liked_at"]),
-        Index(value = ["bookmarked_at"])
+        Index(value = ["bookmarked_at"]),
+        Index(value = ["reaction_type"])
     ]
 )
 data class VideoInteractionEntity(
@@ -48,6 +49,9 @@ data class VideoInteractionEntity(
 
     @ColumnInfo(name = "is_liked")
     val isLiked: Boolean = false,
+
+    @ColumnInfo(name = "reaction_type")
+    val reactionType: String? = null,
 
     @ColumnInfo(name = "liked_at")
     val likedAt: Long? = null,

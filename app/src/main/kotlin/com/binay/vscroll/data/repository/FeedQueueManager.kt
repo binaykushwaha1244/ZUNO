@@ -47,6 +47,10 @@ class FeedQueueManager(
     private val _folderQueue = MutableStateFlow<FeedQueueState?>(null)
     val folderQueue: StateFlow<FeedQueueState?> = _folderQueue
 
+    // Separate playback session for interaction sequential playback (Mode C: Liked, Saved, Notes)
+    private val _interactionQueue = MutableStateFlow<FeedQueueState?>(null)
+    val interactionQueue: StateFlow<FeedQueueState?> = _interactionQueue
+
     // Session feed items & metadata: emitted atomically so items and preference never desynchronize
     private data class SessionFeed(
         val items: List<VideoItem>,
@@ -202,5 +206,41 @@ class FeedQueueManager(
 
     fun closeFolderPlayback() {
         _folderQueue.value = null
+    }
+
+    // --- Mode C: Interaction Sequential Playback (Liked, Saved, Notes) ---
+
+    fun startInteractionPlayback(
+        source: com.binay.vscroll.domain.model.InteractionSource,
+        videos: List<VideoItem>,
+        initialIndex: Int
+    ) {
+        val validIndex = initialIndex.coerceIn(0, (videos.size - 1).coerceAtLeast(0))
+        val initialVideoId = videos.getOrNull(validIndex)?.id ?: 0L
+
+        _interactionQueue.value = FeedQueueState(
+            context = PlaybackContext.InteractionSequential(
+                source = source,
+                initialVideoId = initialVideoId,
+                initialIndex = validIndex
+            ),
+            items = videos,
+            currentIndex = validIndex
+        )
+    }
+
+    fun updateInteractionIndex(index: Int) {
+        _interactionQueue.update { current ->
+            if (current != null && current.items.isNotEmpty()) {
+                val safeIndex = index.coerceIn(0, current.items.size - 1)
+                current.copy(currentIndex = safeIndex)
+            } else {
+                current
+            }
+        }
+    }
+
+    fun closeInteractionPlayback() {
+        _interactionQueue.value = null
     }
 }

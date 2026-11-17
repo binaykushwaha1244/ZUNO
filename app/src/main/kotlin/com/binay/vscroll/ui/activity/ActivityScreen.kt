@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -15,6 +16,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,10 +33,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AvTimer
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -41,7 +50,9 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -50,6 +61,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -69,14 +81,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,10 +102,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.binay.vscroll.domain.model.ActivityDashboardData
 import com.binay.vscroll.domain.model.DailyActivityBar
+import com.binay.vscroll.domain.model.DailyScreenTimeDetails
 import com.binay.vscroll.domain.model.HistoryGroup
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.domain.model.WatchHistoryItem
 import com.binay.vscroll.ui.components.VideoThumbnailView
+import java.time.LocalDate
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,107 +131,127 @@ fun ActivityScreen(
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Dashboard, 1 = History
     var showReminderDialog by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var isDailyDetailOpen by rememberSaveable { mutableStateOf(false) }
+    val selectedDateString by viewModel.selectedDateString.collectAsStateWithLifecycle()
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
+    if (isDailyDetailOpen) {
+        DailyScreenTimeDetailView(
+            viewModel = viewModel,
+            dashboardData = dashboardData,
+            onBack = { isDailyDetailOpen = false },
+            onPlayVideo = onPlayVideo,
+            modifier = modifier
+        )
+    } else {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.TrendingUp,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Activity & Insights",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    },
+                    actions = {
+                        if (selectedTab == 1 && historyItems.isNotEmpty()) {
+                            IconButton(onClick = { showClearHistoryDialog = true }) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.TrendingUp,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    imageVector = Icons.Default.ClearAll,
+                                    contentDescription = "Clear Watch History",
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Activity & Insights",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                },
-                actions = {
-                    if (selectedTab == 1 && historyItems.isNotEmpty()) {
-                        IconButton(onClick = { showClearHistoryDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.ClearAll,
-                                contentDescription = "Clear Watch History",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Segmented Secondary Tab Row
-            SecondaryTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Insights,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Dashboard", fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "History (${historyItems.size})",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
             }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                // Segmented Secondary Tab Row
+                SecondaryTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Insights,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Dashboard", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "History (${historyItems.size})",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    )
+                }
 
-            if (selectedTab == 0) {
-                DashboardTabContent(
-                    data = dashboardData,
-                    onOpenReminderDialog = { showReminderDialog = true },
-                    onPlayVideo = onPlayVideo
-                )
-            } else {
+                if (selectedTab == 0) {
+                    DashboardTabContent(
+                        data = dashboardData,
+                        selectedDateString = selectedDateString,
+                        onOpenReminderDialog = { showReminderDialog = true },
+                        onDayClick = { dateStr ->
+                            viewModel.selectDate(dateStr)
+                            isDailyDetailOpen = true
+                        },
+                        onOpenDailyDetails = {
+                            viewModel.selectToday()
+                            isDailyDetailOpen = true
+                        },
+                        onPlayVideo = onPlayVideo
+                    )
+                } else {
                 HistoryTabContent(
                     items = historyItems,
                     onPlayVideo = { item ->
@@ -238,19 +277,26 @@ fun ActivityScreen(
             currentReminderMinutes = viewingReminderMinutes,
             onDismiss = { showReminderDialog = false },
             onSelectReminder = { minutes ->
-                if (minutes != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val hasPermission = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (!hasPermission) {
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                if (minutes != null) {
+                    com.binay.vscroll.data.notification.ViewingReminderNotifier.createNotificationChannel(context)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (!hasPermission) {
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                    if (!androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                        Toast.makeText(context, "Notifications are currently disabled in device settings. Enable alerts to receive break reminders.", Toast.LENGTH_LONG).show()
                     }
                 }
                 viewModel.setViewingReminder(minutes)
                 showReminderDialog = false
                 val msg = if (minutes != null) {
-                    "Viewing reminder set to $minutes minutes"
+                    val label = formatDurationShort(minutes)
+                    "Viewing reminder set to $label"
                 } else {
                     "Viewing reminder disabled"
                 }
@@ -296,12 +342,16 @@ fun ActivityScreen(
             }
         )
     }
+    }
 }
 
 @Composable
 private fun DashboardTabContent(
     data: ActivityDashboardData,
+    selectedDateString: String,
     onOpenReminderDialog: () -> Unit,
+    onDayClick: (String) -> Unit,
+    onOpenDailyDetails: () -> Unit,
     onPlayVideo: (VideoItem) -> Unit
 ) {
     Column(
@@ -363,7 +413,7 @@ private fun DashboardTabContent(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (data.reminderMinutes != null) "${data.reminderMinutes}m Reminder" else "Set Reminder",
+                            text = formatReminderButtonLabel(data.reminderMinutes),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -384,6 +434,44 @@ private fun DashboardTabContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onOpenDailyDetails)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Insights,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "View today's detailed screen time",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
 
                 if (data.reminderMinutes != null) {
                     Spacer(modifier = Modifier.height(14.dp))
@@ -407,7 +495,7 @@ private fun DashboardTabContent(
                     ) {
                         Text(
                             text = if (data.reminderProgress >= 1f) {
-                                "Break recommended (${data.reminderMinutes}m reached)"
+                                "Break recommended (${formatDurationShort(data.reminderMinutes)} reached)"
                             } else {
                                 "${(data.reminderProgress * 100).toInt()}% of reminder time"
                             },
@@ -420,7 +508,7 @@ private fun DashboardTabContent(
                             }
                         )
                         Text(
-                            text = "${data.reminderMinutes} min reminder",
+                            text = "${formatDurationShort(data.reminderMinutes)} reminder",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -463,8 +551,32 @@ private fun DashboardTabContent(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     data.weeklyBreakdown.forEach { bar ->
-                        DailyBarItem(bar = bar, modifier = Modifier.weight(1f))
+                        DailyBarItem(
+                            bar = bar,
+                            isSelected = (bar.dateString == selectedDateString),
+                            onClick = { onDayClick(bar.dateString) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Insights,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Tap any day to view detailed daily screen time",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
                 }
             }
         }
@@ -583,10 +695,16 @@ private fun DashboardTabContent(
 @Composable
 private fun DailyBarItem(
     bar: DailyActivityBar,
+    isSelected: Boolean = false,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Bottom
     ) {
@@ -594,15 +712,25 @@ private fun DailyBarItem(
         Box(
             modifier = Modifier
                 .width(24.dp)
-                .fillMaxHeight(fraction = bar.normalizedHeight)
+                .fillMaxHeight(fraction = bar.normalizedHeight.coerceIn(0.08f, 1.0f))
                 .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                 .background(
-                    if (bar.dayLabel == "Today") {
-                        MaterialTheme.colorScheme.primary
-                    } else if (bar.watchTimeMs > 0) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+                    when {
+                        isSelected -> MaterialTheme.colorScheme.primary
+                        bar.dayLabel == "Today" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                        bar.watchTimeMs > 0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                )
+                .then(
+                    if (isSelected) {
+                        Modifier.border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                        )
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant
+                        Modifier
                     }
                 )
         )
@@ -611,8 +739,12 @@ private fun DailyBarItem(
             text = bar.dayLabel,
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
-            fontWeight = if (bar.dayLabel == "Today") FontWeight.Bold else FontWeight.Normal,
-            color = if (bar.dayLabel == "Today") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            fontWeight = if (isSelected || bar.dayLabel == "Today") FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected || bar.dayLabel == "Today") {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
         )
     }
 }
@@ -862,65 +994,320 @@ private fun HistoryItemCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ViewingReminderDialog(
     currentReminderMinutes: Int?,
     onDismiss: () -> Unit,
     onSelectReminder: (Int?) -> Unit
 ) {
-    val options = listOf(
-        15 to "15 minutes",
-        30 to "30 minutes",
-        45 to "45 minutes",
-        60 to "60 minutes",
-        null to "Disabled"
-    )
+    val initialMinutes = currentReminderMinutes ?: 30
+    var hours by remember { mutableIntStateOf(initialMinutes / 60) }
+    var minutes by remember { mutableIntStateOf(initialMinutes % 60) }
+
+    val totalMinutes = hours * 60 + minutes
+    val isValid = totalMinutes > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("Viewing Reminder", fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Viewing Reminder", fontWeight = FontWeight.Bold)
+            }
         },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text(
-                    text = "Choose when ZUNO should remind you to take a break.",
+                    text = "Set a custom duration to receive gentle break reminders during active viewing.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                options.forEach { (minutes, label) ->
-                    val isSelected = (currentReminderMinutes == minutes)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onSelectReminder(minutes) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                // Current Summary Banner
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        RadioButton(
-                            selected = isSelected,
-                            onClick = { onSelectReminder(minutes) }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            text = "Reminder Duration",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (totalMinutes <= 0) "No duration selected" else formatDurationSummary(hours, minutes),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (totalMinutes <= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                         )
                     }
+                }
+
+                // Time Pickers: Hours and Minutes
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    TimeValuePicker(
+                        label = "Hours",
+                        value = hours,
+                        range = 0..12,
+                        step = 1,
+                        onValueChange = { hours = it },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    TimeValuePicker(
+                        label = "Minutes",
+                        value = minutes,
+                        range = 0..59,
+                        step = 1,
+                        onValueChange = { minutes = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Quick Preset Chips
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Quick Presets",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val presets = listOf(
+                            15 to "15m",
+                            18 to "18m",
+                            30 to "30m",
+                            45 to "45m",
+                            60 to "1h",
+                            80 to "1h 20m",
+                            120 to "2h"
+                        )
+                        presets.forEach { (mins, label) ->
+                            val isSelected = (totalMinutes == mins)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    hours = mins / 60
+                                    minutes = mins % 60
+                                },
+                                label = {
+                                    Text(
+                                        text = label,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Disable Option
+                OutlinedButton(
+                    onClick = { onSelectReminder(null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Disable Reminder",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
                 }
             }
         },
         confirmButton = {
+            Button(
+                onClick = {
+                    if (isValid) {
+                        onSelectReminder(totalMinutes)
+                    }
+                },
+                enabled = isValid
+            ) {
+                Text("Save Reminder")
+            }
+        },
+        dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("Cancel")
             }
         }
     )
+}
+
+@Composable
+private fun TimeValuePicker(
+    label: String,
+    value: Int,
+    range: IntRange,
+    step: Int = 1,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var textValue by remember(value) {
+        mutableStateOf(String.format(Locale.getDefault(), "%02d", value))
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                IconButton(
+                    onClick = {
+                        val next = if (value > range.first) {
+                            (value - step).coerceAtLeast(range.first)
+                        } else {
+                            range.last
+                        }
+                        onValueChange(next)
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Decrease $label",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .width(58.dp)
+                        .padding(horizontal = 4.dp)
+                ) {
+                    BasicTextField(
+                        value = textValue,
+                        onValueChange = { input ->
+                            val digitsOnly = input.filter { it.isDigit() }.take(2)
+                            textValue = digitsOnly
+                            val parsed = digitsOnly.toIntOrNull()
+                            if (parsed != null) {
+                                val clamped = parsed.coerceIn(range)
+                                onValueChange(clamped)
+                            } else if (digitsOnly.isEmpty()) {
+                                onValueChange(0)
+                            }
+                        },
+                        textStyle = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        ),
+                        singleLine = true,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .padding(vertical = 4.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        val next = if (value < range.last) {
+                            (value + step).coerceAtMost(range.last)
+                        } else {
+                            range.first
+                        }
+                        onValueChange(next)
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Increase $label",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatDurationSummary(hours: Int, minutes: Int): String {
+    return when {
+        hours > 0 && minutes > 0 -> "$hours hr $minutes min"
+        hours > 0 -> "$hours hour${if (hours == 1) "" else "s"}"
+        else -> "$minutes minute${if (minutes == 1) "" else "s"}"
+    }
+}
+
+internal fun formatDurationShort(minutes: Int?): String {
+    if (minutes == null || minutes <= 0) return ""
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h > 0 && m > 0 -> "${h}h ${m}m"
+        h > 0 -> "${h}h"
+        else -> "${m}m"
+    }
+}
+
+internal fun formatReminderButtonLabel(minutes: Int?): String {
+    if (minutes == null || minutes <= 0) return "Set Reminder"
+    val short = formatDurationShort(minutes)
+    return "$short Reminder"
 }
 
 @Deprecated("Use ViewingReminderDialog", ReplaceWith("ViewingReminderDialog(currentGoalMinutes, onDismiss, onSelectGoal)"))
@@ -930,3 +1317,463 @@ private fun GoalConfigDialog(
     onDismiss: () -> Unit,
     onSelectGoal: (Int?) -> Unit
 ) = ViewingReminderDialog(currentGoalMinutes, onDismiss, onSelectGoal)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DailyScreenTimeDetailView(
+    viewModel: ActivityViewModel,
+    dashboardData: ActivityDashboardData,
+    onBack: () -> Unit,
+    onPlayVideo: (VideoItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BackHandler(onBack = onBack)
+    val details by viewModel.dailyScreenTimeDetails.collectAsStateWithLifecycle()
+    val isToday = details.dateString == LocalDate.now().toString()
+    val historyItems by viewModel.historyItems.collectAsStateWithLifecycle()
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                title = {
+                    Text(
+                        text = "Daily Screen Time",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                actions = {
+                    if (!isToday) {
+                        TextButton(onClick = { viewModel.selectToday() }) {
+                            Text(
+                                text = "Today",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Date Switcher Card
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { viewModel.selectPreviousDay() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Previous Day",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = details.formattedFullDate,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        if (isToday) {
+                            Text(
+                                text = "Today",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { viewModel.selectNextDay() },
+                        enabled = !isToday
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Next Day",
+                            tint = if (!isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+            }
+
+            // 7-Day Day Selector Strip
+            if (dashboardData.weeklyBreakdown.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dashboardData.weeklyBreakdown.forEach { bar ->
+                        val isSelected = bar.dateString == details.dateString
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { viewModel.selectDate(bar.dateString) }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = bar.dayLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                val parsedDay = try { LocalDate.parse(bar.dateString).dayOfMonth.toString() } catch (e: Exception) { "" }
+                                Text(
+                                    text = parsedDay,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Hero Screen-Time Card
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "TOTAL VIEWING TIME",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = details.formattedTotalWatchTime,
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (details.totalWatchTimeMs > 0) "Offline screen time recorded" else "No viewing activity recorded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // 3-Metric Stats Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DailyStatCard(
+                    label = "Videos",
+                    value = "${details.totalVideosWatched}",
+                    modifier = Modifier.weight(1f)
+                )
+                DailyStatCard(
+                    label = "Avg / Video",
+                    value = details.formattedAverageWatchTime,
+                    modifier = Modifier.weight(1f)
+                )
+                DailyStatCard(
+                    label = "Sessions",
+                    value = "${details.totalSessions}",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Most Watched Video for Selected Day (if any)
+            val mostWatched = details.mostWatchedVideo
+            if (mostWatched != null) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Top Video of the Day",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    mostWatched.videoItem?.let { onPlayVideo(it) }
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 54.dp, height = 54.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (mostWatched.videoItem != null) {
+                                    VideoThumbnailView(
+                                        videoId = mostWatched.videoItem.id,
+                                        uri = mostWatched.videoItem.contentUri,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = mostWatched.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${mostWatched.folderName} • ${mostWatched.formattedTotalWatchTime}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { mostWatched.videoItem?.let { onPlayVideo(it) } }) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "Play",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Timeline / Sessions List
+            Text(
+                text = "Viewing Timeline",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            if (details.sessions.isEmpty()) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AvTimer,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "No Viewing Activity",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "No videos were watched on this day. When you watch videos, playback sessions will be recorded here offline.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        details.sessions.forEach { session ->
+                            val matchedVideo = historyItems.firstOrNull { it.mediaStoreId == session.mediaStoreId }?.videoItem
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(enabled = matchedVideo != null) {
+                                        matchedVideo?.let { onPlayVideo(it) }
+                                    }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.padding(end = 12.dp)
+                                ) {
+                                    Text(
+                                        text = session.formattedTime,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = session.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${session.folderName} • ${session.sessionCount} session${if (session.sessionCount > 1) "s" else ""}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                                ) {
+                                    Text(
+                                        text = session.formattedDuration,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyStatCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}

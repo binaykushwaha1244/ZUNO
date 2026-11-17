@@ -20,7 +20,7 @@ class LikedViewModel(
     private val videoRepository: VideoRepository
 ) : ViewModel() {
 
-    private val allVideosFlow = videoRepository.getVideos(VideoSortOrder.NEWEST_FIRST)
+    val allVideosFlow = videoRepository.getVideos(VideoSortOrder.NEWEST_FIRST)
 
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab

@@ -87,4 +87,14 @@ object DatabaseMigrations {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_collection_videos_added_at` ON `collection_videos` (`added_at`)")
         }
     }
+
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Safe, non-destructive migration: Add reaction_type column to video_interactions
+            db.execSQL("ALTER TABLE video_interactions ADD COLUMN reaction_type TEXT DEFAULT NULL")
+            // Populate existing liked videos with default reaction "LOVE"
+            db.execSQL("UPDATE video_interactions SET reaction_type = 'LOVE' WHERE is_liked = 1 AND reaction_type IS NULL")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_video_interactions_reaction_type` ON `video_interactions` (`reaction_type`)")
+        }
+    }
 }

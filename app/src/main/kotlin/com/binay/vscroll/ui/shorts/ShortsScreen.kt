@@ -69,9 +69,14 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.binay.vscroll.data.repository.FeedQueueManager
+import com.binay.vscroll.domain.model.ReactionType
 import com.binay.vscroll.domain.model.UserVideoInteraction
 import com.binay.vscroll.domain.model.VideoItem
+import com.binay.vscroll.domain.repository.CollectionRepository
 import com.binay.vscroll.domain.repository.VideoInteractionRepository
+import com.binay.vscroll.ui.components.PlaybackSocialRail
+import com.binay.vscroll.ui.components.ReactionActionItem
+import com.binay.vscroll.ui.components.SaveToCollectionSheet
 import com.binay.vscroll.ui.permission.GalleryPermissionStatus
 import com.binay.vscroll.ui.permission.PermissionHelper
 import com.binay.vscroll.ui.player.NotesBottomSheet
@@ -92,6 +97,7 @@ fun ShortsScreen(
     isShuffleEnabled: Boolean = true,
     onToggleShuffle: () -> Unit = {},
     modifier: Modifier = Modifier,
+    collectionRepository: CollectionRepository? = null,
     onNavigateToLibrary: () -> Unit = {},
     onNavigateToSaved: () -> Unit = {}
 ) {
@@ -108,6 +114,7 @@ fun ShortsScreen(
 
     var activeNoteVideo by remember { mutableStateOf<VideoItem?>(null) }
     var activeNoteInitialText by remember { mutableStateOf<String?>(null) }
+    var activeSaveVideo by remember { mutableStateOf<VideoItem?>(null) }
 
     var permissionStatus by remember {
         mutableStateOf(PermissionHelper.checkPermissionStatus(context))
@@ -263,6 +270,11 @@ fun ShortsScreen(
                         feedQueueManager.updateShortsIndex(index)
                     }
                 },
+                onDoubleTapLike = { video, _ ->
+                    scope.launch {
+                        interactionRepository.setReaction(video, ReactionType.LOVE)
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             ) { video: VideoItem, page: Int ->
                 // Top Header Overlay: Back Button (to Explore Grid) + Context Pill
@@ -335,19 +347,6 @@ fun ShortsScreen(
                 }
 
                 if (!isCleanMode) {
-                    // Social Interaction Rail (Right Edge - Positioned above filename area)
-                    VideoInteractionRail(
-                        video = video,
-                        interactionRepository = interactionRepository,
-                        onOpenNotes = { v, initialText ->
-                            activeNoteVideo = v
-                            activeNoteInitialText = initialText
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 145.dp)
-                    )
-
                     // Bottom Video Information Overlay (Clean social format: Resolution tag + Title only)
                     Column(
                         modifier = Modifier
@@ -378,6 +377,21 @@ fun ShortsScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+
+                    // Unified Social Interaction Rail & Outside Dismissal Scrim
+                    PlaybackSocialRail(
+                        video = video,
+                        interactionRepository = interactionRepository,
+                        onOpenNotes = { v, initialText ->
+                            activeNoteVideo = v
+                            activeNoteInitialText = initialText
+                        },
+                        onSaveToCollection = { v ->
+                            activeSaveVideo = v
+                        },
+                        hasCollectionRepo = collectionRepository != null,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
@@ -413,116 +427,17 @@ fun ShortsScreen(
                 }
             )
         }
-    }
-}
 
-@Composable
-private fun VideoInteractionRail(
-    video: VideoItem,
-    interactionRepository: VideoInteractionRepository,
-    onOpenNotes: (VideoItem, String?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val interaction by interactionRepository.getInteraction(video.id)
-        .collectAsStateWithLifecycle(initialValue = UserVideoInteraction(video.id))
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Like Action
-        SocialActionItem(
-            icon = if (interaction.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            label = if (interaction.isLiked) "Liked" else "Like",
-            tint = if (interaction.isLiked) Color(0xFFFF2A55) else Color.White,
-            onClick = {
-                scope.launch {
-                    val newLiked = interactionRepository.toggleLike(video)
-                    Toast.makeText(
-                        context,
-                        if (newLiked) "Added to Liked Videos" else "Removed from Liked",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        )
-
-        // Notes Action
-        val hasNote = !interaction.note.isNullOrBlank()
-        SocialActionItem(
-            icon = Icons.Default.EditNote,
-            label = if (hasNote) "Note" else "Notes",
-            tint = if (hasNote) MaterialTheme.colorScheme.primary else Color.White,
-            onClick = {
-                onOpenNotes(video, interaction.note)
-            }
-        )
-
-        // Bookmark / Save Action
-        SocialActionItem(
-            icon = if (interaction.isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-            label = if (interaction.isBookmarked) "Saved" else "Save",
-            tint = if (interaction.isBookmarked) MaterialTheme.colorScheme.primary else Color.White,
-            onClick = {
-                scope.launch {
-                    val newSaved = interactionRepository.toggleBookmark(video)
-                    Toast.makeText(
-                        context,
-                        if (newSaved) "Saved to Bookmarks" else "Removed from Bookmarks",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        )
-
-        // Share Action
-        SocialActionItem(
-            icon = Icons.Default.Share,
-            label = "Share",
-            tint = Color.White,
-            onClick = {
-                VideoShareHelper.shareVideo(context, video)
-            }
-        )
-    }
-}
-
-@Composable
-private fun SocialActionItem(
-    icon: ImageVector,
-    label: String,
-    tint: Color = Color.White,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.55f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-        ) {
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = tint,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
+        // Active Save to Collection Bottom Sheet
+        if (activeSaveVideo != null && collectionRepository != null) {
+            SaveToCollectionSheet(
+                video = activeSaveVideo!!,
+                collectionRepository = collectionRepository,
+                interactionRepository = interactionRepository,
+                onDismissRequest = { activeSaveVideo = null }
+            )
         }
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-            fontSize = 10.sp
-        )
     }
 }
+
+

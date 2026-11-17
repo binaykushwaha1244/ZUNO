@@ -25,7 +25,16 @@ class CollectionRepositoryImpl(
         return collectionDao.observeCollectionsWithCounts().map { list ->
             list.map { item ->
                 val coverUri = item.coverVideoId?.let { id ->
-                    ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id).toString()
+                    val base = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                    if (base != null) {
+                        try {
+                            ContentUris.withAppendedId(base, id).toString()
+                        } catch (_: Exception) {
+                            "content://media/external/video/media/$id"
+                        }
+                    } else {
+                        "content://media/external/video/media/$id"
+                    }
                 }
                 VideoCollection(
                     id = item.id,

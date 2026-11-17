@@ -54,6 +54,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,12 +73,14 @@ import com.binay.vscroll.domain.model.FolderItem
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.ui.components.FolderCard
 import com.binay.vscroll.ui.components.VideoCard
+import com.binay.vscroll.ui.components.VideoDetailsBottomSheet
 import com.binay.vscroll.ui.permission.GalleryPermissionStatus
 import com.binay.vscroll.ui.permission.PartialAccessBanner
 import com.binay.vscroll.ui.permission.PermissionHelper
 import com.binay.vscroll.ui.permission.PermissionRequiredCard
 import com.binay.vscroll.ui.theme.ThemeSelectionDialog
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -85,6 +90,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var selectedVideoForDetails by remember { mutableStateOf<VideoItem?>(null) }
 
     // Request permissions launcher
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -126,8 +132,22 @@ fun HomeScreen(
             Toast.makeText(context, "Selected: ${video.title}", Toast.LENGTH_SHORT).show()
             onVideoClick(video)
         },
+        onVideoMoreClick = { video ->
+            selectedVideoForDetails = video
+        },
         modifier = modifier
     )
+
+    // Video details bottom sheet
+    selectedVideoForDetails?.let { detailVideo ->
+        VideoDetailsBottomSheet(
+            video = detailVideo,
+            onDismissRequest = { selectedVideoForDetails = null },
+            onPlay = {
+                onVideoClick(detailVideo)
+            }
+        )
+    }
 
     // Theme selector dialog
     if (uiState.isThemeDialogVisible) {
@@ -165,6 +185,7 @@ internal fun HomeScreenContent(
     onRefresh: () -> Unit,
     onRequestPermission: () -> Unit,
     onVideoClick: (VideoItem) -> Unit,
+    onVideoMoreClick: (VideoItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val tabs = listOf(
@@ -449,7 +470,7 @@ internal fun HomeScreenContent(
                             VideoCard(
                                 video = video,
                                 onClick = { onVideoClick(video) },
-                                onMoreClick = {}
+                                onMoreClick = { onVideoMoreClick(video) }
                             )
                         }
                     }

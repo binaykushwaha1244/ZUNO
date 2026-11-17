@@ -19,9 +19,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Share
@@ -33,6 +36,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,20 +57,40 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.binay.vscroll.domain.model.FeedQueueState
 import com.binay.vscroll.domain.model.PlaybackContext
+import com.binay.vscroll.domain.model.ReactionType
+import com.binay.vscroll.domain.model.UserVideoInteraction
 import com.binay.vscroll.domain.model.VideoItem
+import com.binay.vscroll.domain.repository.CollectionRepository
+import com.binay.vscroll.domain.repository.VideoInteractionRepository
+import com.binay.vscroll.ui.components.PlaybackSocialRail
+import com.binay.vscroll.ui.components.ReactionActionItem
+import com.binay.vscroll.ui.components.SaveToCollectionSheet
+import com.binay.vscroll.ui.player.NotesBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderPlaybackScreen(
     feedQueueState: FeedQueueState,
     playerViewModel: PlayerViewModel,
     onIndexChanged: (Int) -> Unit,
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    interactionRepository: VideoInteractionRepository? = null,
+    collectionRepository: CollectionRepository? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     val isCleanMode by playerViewModel.isCleanViewingMode.collectAsStateWithLifecycle()
     val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
+
+    var activeNoteVideo by remember { mutableStateOf<VideoItem?>(null) }
+    var activeNoteInitialText by remember { mutableStateOf<String?>(null) }
+    var activeSaveVideo by remember { mutableStateOf<VideoItem?>(null) }
+
     val isCollection = feedQueueState.context is PlaybackContext.CollectionSequential
     val playbackTitle = when (val ctx = feedQueueState.context) {
         is PlaybackContext.FolderSequential -> ctx.folderName
@@ -113,6 +140,13 @@ fun FolderPlaybackScreen(
             initialIndex = feedQueueState.currentIndex,
             playerViewModel = playerViewModel,
             onIndexChanged = onIndexChanged,
+            onDoubleTapLike = { video, _ ->
+                interactionRepository?.let { repo ->
+                    scope.launch {
+                        repo.setReaction(video, ReactionType.LOVE)
+                    }
+                }
+            },
             modifier = Modifier.fillMaxSize()
         ) { video: VideoItem, pageIndex: Int ->
             // Subtle gradient overlay when social UI or back button is visible
@@ -208,28 +242,6 @@ fun FolderPlaybackScreen(
             }
 
             if (!isCleanMode) {
-                // Right Rail Social Actions (Positioned above filename area)
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 145.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    FolderSocialActionItem(icon = Icons.Default.FavoriteBorder, label = "Like") {
-                        Toast.makeText(context, "Likes synced with offline library", Toast.LENGTH_SHORT).show()
-                    }
-                    FolderSocialActionItem(icon = Icons.Default.ChatBubbleOutline, label = "Notes") {
-                        Toast.makeText(context, "Notes synced with offline library", Toast.LENGTH_SHORT).show()
-                    }
-                    FolderSocialActionItem(icon = Icons.Default.BookmarkBorder, label = "Save") {
-                        Toast.makeText(context, "Bookmarks synced with offline library", Toast.LENGTH_SHORT).show()
-                    }
-                    FolderSocialActionItem(icon = Icons.Default.Share, label = "Share") {
-                        VideoShareHelper.shareVideo(context, video)
-                    }
-                }
-
                 // Bottom Video Metadata Overlay (Clean social format: Resolution tag + Title only)
                 Column(
                     modifier = Modifier
@@ -260,44 +272,67 @@ fun FolderPlaybackScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                // Unified Social Interaction Rail & Outside Dismissal Scrim
+                PlaybackSocialRail(
+                    video = video,
+                    interactionRepository = interactionRepository,
+                    onOpenNotes = { v, initialText ->
+                        activeNoteVideo = v
+                        activeNoteInitialText = initialText
+                    },
+                    onSaveToCollection = { v ->
+                        activeSaveVideo = v
+                    },
+                    hasCollectionRepo = collectionRepository != null,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
+        }
+
+        // Active Note Bottom Sheet Editor
+        if (activeNoteVideo != null && interactionRepository != null) {
+            NotesBottomSheet(
+                video = activeNoteVideo,
+                initialNote = activeNoteInitialText,
+                onDismissRequest = {
+                    activeNoteVideo = null
+                    activeNoteInitialText = null
+                },
+                onSaveNote = { newText ->
+                    activeNoteVideo?.let { v ->
+                        scope.launch {
+                            interactionRepository.saveNote(v, newText)
+                            Toast.makeText(context, "Note saved offline", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    activeNoteVideo = null
+                    activeNoteInitialText = null
+                },
+                onDeleteNote = {
+                    activeNoteVideo?.let { v ->
+                        scope.launch {
+                            interactionRepository.deleteNote(v.id)
+                            Toast.makeText(context, "Note deleted", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    activeNoteVideo = null
+                    activeNoteInitialText = null
+                }
+            )
+        }
+
+        // Active Save to Collection Bottom Sheet
+        if (activeSaveVideo != null && collectionRepository != null) {
+            SaveToCollectionSheet(
+                video = activeSaveVideo!!,
+                collectionRepository = collectionRepository,
+                interactionRepository = interactionRepository,
+                onDismissRequest = { activeSaveVideo = null }
+            )
         }
     }
 }
 
-@Composable
-private fun FolderSocialActionItem(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.55f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-        ) {
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-            fontSize = 10.sp
-        )
-    }
-}
+
 

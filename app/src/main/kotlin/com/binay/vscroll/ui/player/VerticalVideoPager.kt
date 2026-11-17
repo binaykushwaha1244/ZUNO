@@ -1,19 +1,24 @@
 package com.binay.vscroll.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.VerticalPager
@@ -22,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
@@ -34,19 +40,29 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.binay.vscroll.data.player.PlaybackTransitionTracer
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.ui.components.VideoThumbnailView
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun VerticalVideoPager(
@@ -55,6 +71,7 @@ fun VerticalVideoPager(
     playerViewModel: PlayerViewModel,
     modifier: Modifier = Modifier,
     onIndexChanged: (Int) -> Unit = {},
+    onDoubleTapLike: ((VideoItem, Offset) -> Unit)? = null,
     overlayContent: @Composable (VideoItem, Int) -> Unit
 ) {
     if (videos.isEmpty()) return
@@ -147,17 +164,36 @@ fun VerticalVideoPager(
                 )
             }
 
-            // Layer 3: Transparent Tap Layer on top of video surface (reliable tap detection in both Clean and Social modes)
+            // Layer 3: Transparent Tap & Double-Tap Layer on top of video surface
+            var doubleTapHeartOffset by remember(video.id) { mutableStateOf<Offset?>(null) }
+            var doubleTapTrigger by remember(video.id) { mutableIntStateOf(0) }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        playerViewModel.toggleControlsVisibility()
+                    .pointerInput(video.id) {
+                        detectTapGestures(
+                            onTap = {
+                                playerViewModel.toggleControlsVisibility()
+                            },
+                            onDoubleTap = { offset ->
+                                doubleTapHeartOffset = offset
+                                doubleTapTrigger++
+                                onDoubleTapLike?.invoke(video, offset)
+                            }
+                        )
                     }
             )
+
+            // Double-Tap Animated Heart Effect
+            doubleTapHeartOffset?.let { tapOffset ->
+                key(doubleTapTrigger) {
+                    DoubleTapHeartAnimation(
+                        offset = tapOffset,
+                        onAnimationEnd = { doubleTapHeartOffset = null }
+                    )
+                }
+            }
 
             // Layer 3: Minimal Buffering Indicator
             if (isCurrentPage && playbackState.isBuffering && playbackState.playbackError == null) {
@@ -256,10 +292,7 @@ fun VerticalVideoPager(
                 }
             }
 
-            // Layer 7: Overlay Content (Header badge, Video metadata, Social action rail)
-            overlayContent(video, page)
-
-            // Layer 8: Playback Controls Overlay (Visible on tap, auto-hides after 3s when playing)
+            // Layer 7: Playback Controls Overlay (Visible on tap, auto-hides after 3s when playing)
             if (isCurrentPage) {
                 PlaybackControlsOverlay(
                     playbackState = playbackState,
@@ -275,12 +308,74 @@ fun VerticalVideoPager(
                     onInteracted = { playerViewModel.onControlsInteracted() }
                 )
 
-                // Layer 9: Floating HUD feedback for volume and brightness
+                // Layer 8: Floating HUD feedback for volume and brightness
                 GestureHudIndicator(
                     playerViewModel = playerViewModel,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
+
+            // Layer 9: Overlay Content (Header badge, Video metadata, Social action rail & Reaction picker)
+            overlayContent(video, page)
         }
+    }
+}
+
+/**
+ * Animated double-tap heart with smooth scale-up, settling, and fade-out.
+ */
+@Composable
+private fun DoubleTapHeartAnimation(
+    offset: Offset,
+    onAnimationEnd: () -> Unit
+) {
+    val scale = remember { Animatable(0f) }
+    val alpha = remember { Animatable(1f) }
+    val rotation = remember { -10f + (Math.random().toFloat() * 20f) }
+
+    LaunchedEffect(Unit) {
+        launch {
+            scale.animateTo(
+                targetValue = 1.35f,
+                animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
+            )
+            scale.animateTo(
+                targetValue = 1.05f,
+                animationSpec = tween(durationMillis = 160, easing = LinearOutSlowInEasing)
+            )
+        }
+        launch {
+            delay(360)
+            alpha.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 280, easing = FastOutLinearInEasing)
+            )
+            onAnimationEnd()
+        }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Icon(
+            imageVector = Icons.Default.Favorite,
+            contentDescription = null,
+            tint = Color(0xFFFF2A55),
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        x = (offset.x - 48.dp.toPx()).toInt(),
+                        y = (offset.y - 48.dp.toPx()).toInt()
+                    )
+                }
+                .size(96.dp)
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                    this.alpha = alpha.value
+                    rotationZ = rotation
+                    shadowElevation = 18f
+                }
+        )
     }
 }

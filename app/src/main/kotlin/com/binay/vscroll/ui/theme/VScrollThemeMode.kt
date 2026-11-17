@@ -18,14 +18,6 @@ enum class VScrollThemeMode(
         surfacePreviewColor = Color(0xFFFAF9F6),
         isDark = false
     ),
-    OCEAN_POP(
-        displayName = "Ocean Pop",
-        subtitle = "Electric blue, sky blue & crisp white",
-        primaryPreviewColor = Color(0xFF0066FF),
-        secondaryPreviewColor = Color(0xFF0EA5E9),
-        surfacePreviewColor = Color(0xFFFFFFFF),
-        isDark = false
-    ),
     SUNSET_GLOW(
         displayName = "Sunset Glow",
         subtitle = "Vibrant coral, orange & warm peach",

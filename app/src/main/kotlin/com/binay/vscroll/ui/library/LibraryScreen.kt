@@ -9,6 +9,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -41,11 +44,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
@@ -82,6 +83,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -94,8 +96,10 @@ import com.binay.vscroll.domain.model.FolderItem
 import com.binay.vscroll.domain.model.VideoCollection
 import com.binay.vscroll.domain.model.VideoItem
 import com.binay.vscroll.ui.components.CollectionCard
+import com.binay.vscroll.ui.components.EmptyStateView
 import com.binay.vscroll.ui.components.FolderCard
 import com.binay.vscroll.ui.components.VideoCard
+import com.binay.vscroll.ui.components.VideoDetailsBottomSheet
 import com.binay.vscroll.ui.home.HomeUiState
 import com.binay.vscroll.ui.home.HomeViewModel
 import com.binay.vscroll.ui.home.VideoSortDialog
@@ -104,6 +108,7 @@ import com.binay.vscroll.ui.permission.PartialAccessBanner
 import com.binay.vscroll.ui.permission.PermissionHelper
 import com.binay.vscroll.ui.permission.PermissionRequiredCard
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     viewModel: HomeViewModel,
@@ -113,6 +118,7 @@ fun LibraryScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var selectedVideoForDetails by remember { mutableStateOf<VideoItem?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -178,6 +184,9 @@ fun LibraryScreen(
         },
         onVideoLongClick = { video ->
             viewModel.enterMultiSelect(video.id)
+        },
+        onVideoMoreClick = { video ->
+            selectedVideoForDetails = video
         },
         modifier = modifier
     )
@@ -336,6 +345,23 @@ fun LibraryScreen(
             onDismiss = { viewModel.showDeleteVideosDialog(false) }
         )
     }
+
+    selectedVideoForDetails?.let { detailVideo ->
+        VideoDetailsBottomSheet(
+            video = detailVideo,
+            onDismissRequest = { selectedVideoForDetails = null },
+            onPlay = {
+                val idx = uiState.displayedVideos.indexOfFirst { it.id == detailVideo.id }.coerceAtLeast(0)
+                onVideoClick(
+                    detailVideo,
+                    idx,
+                    uiState.displayedVideos,
+                    uiState.selectedFolder,
+                    uiState.selectedCollection
+                )
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -353,6 +379,7 @@ internal fun LibraryScreenContent(
     onRequestPermission: () -> Unit,
     onVideoClick: (VideoItem, Int) -> Unit,
     onVideoLongClick: (VideoItem) -> Unit,
+    onVideoMoreClick: (VideoItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -624,7 +651,7 @@ internal fun LibraryScreenContent(
                                 .clickable { viewModel.showAddToCollectionSheet(true) }
                                 .padding(8.dp)
                         ) {
-                            Icon(Icons.Default.PlaylistAdd, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                             Text("Collect", style = MaterialTheme.typography.labelSmall)
                         }
 
@@ -636,7 +663,7 @@ internal fun LibraryScreenContent(
                                 .clickable { viewModel.showMoveToFolderSheet(true) }
                                 .padding(8.dp)
                         ) {
-                            Icon(Icons.Default.DriveFileMove, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            Icon(Icons.AutoMirrored.Filled.DriveFileMove, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                             Text("Move", style = MaterialTheme.typography.labelSmall)
                         }
 
@@ -787,6 +814,7 @@ internal fun LibraryScreenContent(
                             selectedVideoIds = state.selectedVideoIds,
                             onVideoClick = onVideoClick,
                             onVideoLongClick = onVideoLongClick,
+                            onVideoMoreClick = onVideoMoreClick,
                             emptyMessage = when {
                                 state.selectedCollection != null -> "This collection has no videos yet.\nSelect videos from your library to add them here."
                                 state.selectedFolder != null -> "No videos found in this folder."
@@ -809,19 +837,14 @@ private fun FoldersTabContent(
     onCreateFolderClick: () -> Unit
 ) {
     if (folders.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("No Folders Found", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = onCreateFolderClick) {
-                    Icon(Icons.Default.Add, null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Create Folder")
-                }
-            }
-        }
+        EmptyStateView(
+            icon = Icons.Default.Folder,
+            title = "No Video Folders Found",
+            description = "No local folders containing videos were detected on your device. Rescan or check permissions.",
+            actionText = "Create Folder",
+            onActionClick = onCreateFolderClick,
+            modifier = Modifier.fillMaxSize()
+        )
     } else {
         LazyVerticalGrid(
             columns = GridCells.Fixed(1),
@@ -848,44 +871,20 @@ private fun CollectionsTabContent(
     onCreateCollectionClick: () -> Unit
 ) {
     if (collections.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier.size(72.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.CollectionsBookmark,
-                            null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("No Virtual Collections", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Create custom playlists to organize your videos without duplicating files on storage.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onCreateCollectionClick) {
-                    Icon(Icons.Default.Add, null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("New Collection")
-                }
-            }
-        }
+        EmptyStateView(
+            icon = Icons.Default.CollectionsBookmark,
+            title = "No Collections Yet",
+            description = "Create custom playlists to organize your videos into curated categories without duplicating storage.",
+            actionText = "New Collection",
+            onActionClick = onCreateCollectionClick,
+            modifier = Modifier.fillMaxSize()
+        )
     } else {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(1),
+            columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             itemsIndexed(collections, key = { _, c -> c.id }) { _, collection ->
@@ -908,17 +907,16 @@ private fun VideosGridContent(
     selectedVideoIds: Set<Long>,
     onVideoClick: (VideoItem, Int) -> Unit,
     onVideoLongClick: (VideoItem) -> Unit,
+    onVideoMoreClick: (VideoItem) -> Unit = {},
     emptyMessage: String
 ) {
     if (videos.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = emptyMessage,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(24.dp)
-            )
-        }
+        EmptyStateView(
+            icon = Icons.Default.VideoLibrary,
+            title = "No Videos Found",
+            description = emptyMessage,
+            modifier = Modifier.fillMaxSize()
+        )
     } else {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -943,7 +941,8 @@ private fun VideosGridContent(
                     VideoCard(
                         video = video,
                         onClick = { onVideoClick(video, index) },
-                        onLongClick = { onVideoLongClick(video) }
+                        onLongClick = { onVideoLongClick(video) },
+                        onMoreClick = { onVideoMoreClick(video) }
                     )
 
                     // Multi-select Checkmark overlay

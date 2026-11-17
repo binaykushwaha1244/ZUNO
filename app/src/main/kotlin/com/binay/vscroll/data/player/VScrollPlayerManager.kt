@@ -142,10 +142,24 @@ class VScrollPlayerManager(
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            val errorMsg = when (error.errorCode) {
-                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "Video file not found or inaccessible"
-                PlaybackException.ERROR_CODE_DECODING_FAILED -> "Codec decoding failed for this video"
-                PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED -> "Corrupted or unsupported video format"
+            val current = _playbackState.value.currentVideo
+            val isDecoderError = error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
+            val isExceedingHardwareLimit = current != null && (current.height > 2176 || current.width > 4096)
+
+            val errorMsg = when {
+                isExceedingHardwareLimit && isDecoderError -> {
+                    "This 4K video (${current!!.width}×${current.height}) exceeds the device hardware decoder limit (max 2176 vertical lines on this chipset)."
+                }
+                error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
+                    "Video file not found or inaccessible"
+                error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ->
+                    "Hardware decoder failed for this video format"
+                error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ->
+                    "Unsupported video codec or profile for this device"
+                error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ->
+                    "Corrupted or unsupported video format"
                 else -> error.localizedMessage ?: "Playback error encountered (${error.errorCodeName})"
             }
             _playbackState.update {
@@ -169,7 +183,7 @@ class VScrollPlayerManager(
         val trackSelector = DefaultTrackSelector(appContext).apply {
             parameters = buildUponParameters()
                 .setForceHighestSupportedBitrate(true)
-                .setExceedRendererCapabilitiesIfNecessary(true)
+                .setExceedRendererCapabilitiesIfNecessary(false) // Never force hardware decoder to accept unsupported codec configurations
                 .setExceedVideoConstraintsIfNecessary(true)
                 .build()
         }
@@ -243,7 +257,23 @@ class VScrollPlayerManager(
             )
         }
 
-        val mediaItem = MediaItem.fromUri(video.contentUri)
+        val mimeType = when {
+            !video.mimeType.isNullOrBlank() && video.mimeType != "video/*" -> video.mimeType
+            video.title.endsWith(".webm", ignoreCase = true) -> "video/webm"
+            video.title.endsWith(".mp4", ignoreCase = true) -> "video/mp4"
+            video.title.endsWith(".mkv", ignoreCase = true) -> "video/x-matroska"
+            video.title.endsWith(".3gp", ignoreCase = true) -> "video/3gpp"
+            video.title.endsWith(".ts", ignoreCase = true) -> "video/mp2t"
+            else -> null
+        }
+        val mediaItem = MediaItem.Builder()
+            .setUri(video.contentUri)
+            .apply {
+                if (mimeType != null) {
+                    setMimeType(mimeType)
+                }
+            }
+            .build()
         PlaybackTransitionTracer.markEvent("5. MEDIA_ITEM_ASSIGNED")
         activePlayer.setMediaItem(mediaItem, /* resetPosition = */ true)
         PlaybackTransitionTracer.markEvent("6. PLAYER_PREPARE_START")

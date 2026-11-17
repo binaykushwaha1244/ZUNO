@@ -25,7 +25,7 @@ import com.binay.vscroll.data.local.entity.WatchHistoryEntity
         VideoCollectionEntity::class,
         CollectionVideoCrossRefEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class VScrollDatabase : RoomDatabase() {
@@ -52,7 +52,8 @@ abstract class VScrollDatabase : RoomDatabase() {
                 .addMigrations(
                     DatabaseMigrations.MIGRATION_1_2,
                     DatabaseMigrations.MIGRATION_2_3,
-                    DatabaseMigrations.MIGRATION_3_4
+                    DatabaseMigrations.MIGRATION_3_4,
+                    DatabaseMigrations.MIGRATION_4_5
                 )
                 .build()
                 .also { INSTANCE = it }

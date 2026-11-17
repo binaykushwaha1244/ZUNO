@@ -1,6 +1,7 @@
 package com.binay.vscroll.domain.repository
 
 import com.binay.vscroll.domain.model.ActivityDashboardData
+import com.binay.vscroll.domain.model.DailyScreenTimeDetails
 import com.binay.vscroll.domain.model.WatchHistoryItem
 import com.binay.vscroll.domain.model.VideoItem
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,8 @@ interface WatchHistoryRepository {
     fun observeAllHistory(): Flow<List<WatchHistoryItem>>
 
     fun observeDashboardData(goalMinutes: Int?): Flow<ActivityDashboardData>
+
+    fun observeDailyScreenTime(dateString: String): Flow<DailyScreenTimeDetails>
 
     suspend fun deleteHistoryItem(mediaStoreId: Long)
 

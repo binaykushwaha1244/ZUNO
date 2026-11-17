@@ -1,5 +1,6 @@
 package com.binay.vscroll.domain.repository
 
+import com.binay.vscroll.domain.model.ReactionType
 import com.binay.vscroll.domain.model.UserNoteItem
 import com.binay.vscroll.domain.model.UserVideoInteraction
 import com.binay.vscroll.domain.model.UserVideoItem
@@ -13,6 +14,10 @@ interface VideoInteractionRepository {
     suspend fun toggleLike(video: VideoItem): Boolean
 
     suspend fun setLiked(video: VideoItem, isLiked: Boolean)
+
+    suspend fun setReaction(video: VideoItem, reaction: ReactionType?)
+
+    suspend fun toggleReaction(video: VideoItem, reaction: ReactionType): ReactionType?
 
     suspend fun toggleBookmark(video: VideoItem): Boolean
 

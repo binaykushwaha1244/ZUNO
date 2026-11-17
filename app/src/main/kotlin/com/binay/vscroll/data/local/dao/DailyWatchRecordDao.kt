@@ -97,6 +97,12 @@ interface DailyWatchRecordDao {
     )
     fun observeRangeSummary(startDateString: String): Flow<DailySummaryProjection?>
 
+    @Query("SELECT * FROM daily_watch_records WHERE date_string = :dateString ORDER BY last_watched_at DESC")
+    fun observeRecordsForDate(dateString: String): Flow<List<DailyWatchRecordEntity>>
+
+    @Query("SELECT * FROM daily_watch_records WHERE date_string = :dateString ORDER BY last_watched_at DESC")
+    suspend fun getRecordsForDateSync(dateString: String): List<DailyWatchRecordEntity>
+
     @Query("DELETE FROM daily_watch_records WHERE media_store_id = :mediaStoreId")
     suspend fun deleteForVideo(mediaStoreId: Long): Int
 

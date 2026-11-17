@@ -5,7 +5,7 @@
 All user interactions, collections, notes, watch history, and analytics in ZUNO are stored locally using **Android Room Database** with SQLite.
 
 - **Database File:** `vscroll_database.db`
-- **Current Version:** `4`
+- **Current Version:** `5`
 - **Data Safety:** Destructive migrations (`fallbackToDestructiveMigration()`) are strictly forbidden. All schema updates use safe migration scripts (`Migration(M, N)`).
 
 ```mermaid
@@ -91,6 +91,7 @@ erDiagram
 7. **`collection_items` (`CollectionItemEntity`):**
    - Maps videos into virtual collections.
    - Supports many-to-many relationship: one video can belong to multiple collections.
+   - `CollectionWithCount` queries dynamically retrieve the cover thumbnail (`coverVideoId`) from the most recently added video (`MAX(added_at)`) without requiring schema changes or redundant columns.
 8. **`folder_custom_names` (`FolderCustomNameEntity`):**
    - Stores custom display aliases for physical storage folders.
 
@@ -103,6 +104,7 @@ erDiagram
 | **`MIGRATION_1_2`** | $1 \rightarrow 2$ | Created `liked_videos`, `saved_videos`, and `video_notes` tables with indexes. |
 | **`MIGRATION_2_3`** | $2 \rightarrow 3$ | Created `watch_history` and `daily_watch_records` tables with date-based composite indices. |
 | **`MIGRATION_3_4`** | $3 \rightarrow 4$ | Created `collections`, `collection_items`, and `folder_custom_names` tables with foreign keys and unique constraints. |
+| **`MIGRATION_4_5`** | $4 \rightarrow 5$ | Added `reaction_type TEXT` column and index to `video_interactions` table; backfilled existing liked videos with `'LOVE'` to preserve full user interaction history. |
 
 ---
 

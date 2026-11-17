@@ -4,6 +4,7 @@ import com.binay.vscroll.data.local.dao.VideoInteractionDao
 import com.binay.vscroll.data.local.dao.VideoNoteDao
 import com.binay.vscroll.data.local.entity.VideoInteractionEntity
 import com.binay.vscroll.data.local.entity.VideoNoteEntity
+import com.binay.vscroll.domain.model.ReactionType
 import com.binay.vscroll.domain.model.UserNoteItem
 import com.binay.vscroll.domain.model.UserVideoInteraction
 import com.binay.vscroll.domain.model.UserVideoItem
@@ -27,14 +28,17 @@ class VideoInteractionRepositoryImpl(
             interactionDao.getInteraction(mediaStoreId),
             noteDao.getNote(mediaStoreId)
         ) { interaction, note ->
+            val reaction = ReactionType.fromString(interaction?.reactionType)
+            val isLiked = (interaction?.isLiked == true) || (reaction != null)
             UserVideoInteraction(
                 mediaStoreId = mediaStoreId,
-                isLiked = interaction?.isLiked ?: false,
+                isLiked = isLiked,
                 likedAt = interaction?.likedAt,
                 isBookmarked = interaction?.isBookmarked ?: false,
                 bookmarkedAt = interaction?.bookmarkedAt,
                 note = note?.noteText,
-                noteUpdatedAt = note?.updatedAt
+                noteUpdatedAt = note?.updatedAt,
+                reaction = reaction
             )
         }
     }
@@ -42,11 +46,14 @@ class VideoInteractionRepositoryImpl(
     override suspend fun toggleLike(video: VideoItem): Boolean = withContext(dispatcher) {
         val now = System.currentTimeMillis()
         val current = interactionDao.getInteractionSync(video.id)
-        val newLikedState = !(current?.isLiked ?: false)
+        val currentlyLiked = (current?.isLiked == true) || (current?.reactionType != null)
+        val newLikedState = !currentlyLiked
+        val newReaction = if (newLikedState) ReactionType.LOVE.name else null
 
         val entityToSave = if (current != null) {
             current.copy(
                 isLiked = newLikedState,
+                reactionType = newReaction,
                 likedAt = if (newLikedState) now else current.likedAt,
                 updatedAt = now,
                 // Update cached metadata in case title or folder changed
@@ -69,6 +76,7 @@ class VideoInteractionRepositoryImpl(
                 cachedMimeType = video.mimeType,
                 cachedDateAdded = video.dateAdded,
                 isLiked = newLikedState,
+                reactionType = newReaction,
                 likedAt = now,
                 isBookmarked = false,
                 bookmarkedAt = null,
@@ -83,10 +91,12 @@ class VideoInteractionRepositoryImpl(
     override suspend fun setLiked(video: VideoItem, isLiked: Boolean) = withContext(dispatcher) {
         val now = System.currentTimeMillis()
         val current = interactionDao.getInteractionSync(video.id)
+        val newReaction = if (isLiked) (current?.reactionType ?: ReactionType.LOVE.name) else null
 
         val entityToSave = if (current != null) {
             current.copy(
                 isLiked = isLiked,
+                reactionType = newReaction,
                 likedAt = if (isLiked) (current.likedAt ?: now) else current.likedAt,
                 updatedAt = now,
                 cachedTitle = video.title,
@@ -108,6 +118,7 @@ class VideoInteractionRepositoryImpl(
                 cachedMimeType = video.mimeType,
                 cachedDateAdded = video.dateAdded,
                 isLiked = isLiked,
+                reactionType = newReaction,
                 likedAt = if (isLiked) now else null,
                 isBookmarked = false,
                 bookmarkedAt = null,
@@ -117,6 +128,57 @@ class VideoInteractionRepositoryImpl(
 
         interactionDao.insertOrUpdate(entityToSave)
         Unit
+    }
+
+    override suspend fun setReaction(video: VideoItem, reaction: ReactionType?) = withContext(dispatcher) {
+        val now = System.currentTimeMillis()
+        val current = interactionDao.getInteractionSync(video.id)
+        val isLiked = (reaction != null)
+        val reactionStr = reaction?.name
+
+        val entityToSave = if (current != null) {
+            current.copy(
+                isLiked = isLiked,
+                reactionType = reactionStr,
+                likedAt = if (isLiked) (current.likedAt ?: now) else current.likedAt,
+                updatedAt = now,
+                cachedTitle = video.title,
+                cachedFolderName = video.folderName,
+                cachedDurationMs = video.durationMillis,
+                cachedSizeBytes = video.sizeBytes,
+                contentUri = video.uriString
+            )
+        } else {
+            VideoInteractionEntity(
+                mediaStoreId = video.id,
+                contentUri = video.uriString,
+                cachedTitle = video.title,
+                cachedFolderName = video.folderName,
+                cachedDurationMs = video.durationMillis,
+                cachedSizeBytes = video.sizeBytes,
+                cachedWidth = video.width,
+                cachedHeight = video.height,
+                cachedMimeType = video.mimeType,
+                cachedDateAdded = video.dateAdded,
+                isLiked = isLiked,
+                reactionType = reactionStr,
+                likedAt = if (isLiked) now else null,
+                isBookmarked = false,
+                bookmarkedAt = null,
+                updatedAt = now
+            )
+        }
+
+        interactionDao.insertOrUpdate(entityToSave)
+        Unit
+    }
+
+    override suspend fun toggleReaction(video: VideoItem, reaction: ReactionType): ReactionType? = withContext(dispatcher) {
+        val current = interactionDao.getInteractionSync(video.id)
+        val currentReaction = ReactionType.fromString(current?.reactionType)
+        val targetReaction = if (currentReaction == reaction) null else reaction
+        setReaction(video, targetReaction)
+        targetReaction
     }
 
     override suspend fun toggleBookmark(video: VideoItem): Boolean = withContext(dispatcher) {
@@ -249,7 +311,8 @@ class VideoInteractionRepositoryImpl(
                     likedAt = entity.likedAt,
                     isBookmarked = entity.isBookmarked,
                     bookmarkedAt = entity.bookmarkedAt,
-                    videoItem = matching
+                    videoItem = matching,
+                    reaction = ReactionType.fromString(entity.reactionType) ?: ReactionType.LOVE
                 )
             }
         }
